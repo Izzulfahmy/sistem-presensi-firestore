@@ -396,8 +396,8 @@
                } catch(e) {}
             }
             
-            setIsLoading(false);
             setIsDataReady(true);
+            setIsLoading(false);
           } catch (error) {
             console.error(error);
             Swal.fire('Koneksi Gagal', 'Gagal memuat database Firestore.', 'error');
@@ -590,7 +590,6 @@
         });
       };
 
-      // FUNGSI HELPER: Pastikan semua client lain dibuatkan status "Menunggu"
       const ensureAllClientsHaveRecord = async (todayStr, skipUserId) => {
           const clients = usersDb.filter(u => u.role === 'client');
           let additions = [];
@@ -600,7 +599,6 @@
               if (!hasRec) {
                   const pRec = { id: Date.now() + client.id, userId: client.id, date: todayStr, timeIn: '-', timeOut: '-', status: 'Menunggu' };
                   additions.push(pRec);
-                  // Simpan ke Firestore (jalan di background agar cepat)
                   window.fs.setDoc(window.fs.doc(window.db, "attendance", pRec.id.toString()), pRec).catch(e => console.error(e));
               }
           }
@@ -637,16 +635,13 @@
                 await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
             }
 
-            // Draf otomatis untuk user lain (Menunggu)
             const newPlaceholders = await ensureAllClientsHaveRecord(todayStr, user.id);
-            
             const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
             setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
 
             Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           
           } else {
-            // Logika Pulang
             const activeRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr && a.status !== 'Menunggu');
             if(activeRec) {
                 const up = attendanceDb.map(r => r.id === activeRec.id ? {...r, timeOut: time} : r);
@@ -697,9 +692,7 @@
                 await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
             }
 
-            // Draf otomatis untuk user lain
             const newPlaceholders = await ensureAllClientsHaveRecord(todayStr, user.id);
-            
             const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
             setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
 
@@ -806,7 +799,7 @@
                         else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
                         else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
                         else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
-                        else { row.push(''); } // Untuk 'Menunggu', dibiarkan kosong
+                        else { row.push(''); } 
                       } else {
                         if (isRoutineHoliday || isSpecialHoliday) row.push('L');
                         else {
@@ -1009,6 +1002,39 @@
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
+
+      // GUARD LOGIN SCREEN
+      if (!user) return (
+        <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
+          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+          
+          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-sm border border-slate-100 relative z-10">
+            <div className="text-center mb-8">
+              <div className="bg-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 shadow-blue-200 shadow-xl">
+                <i className="fas fa-fingerprint text-white text-4xl -rotate-3"></i>
+              </div>
+              <h1 className="text-2xl font-bold text-slate-800 tracking-tight leading-tight">{settingsDb.namaInstansi || 'Memuat...'}</h1>
+              <p className="text-slate-400 mt-1 font-semibold uppercase tracking-widest text-[10px]">Sistem Presensi</p>
+            </div>
+            <div className="space-y-5">
+              <input type="text" id="logU" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all font-semibold text-slate-700 placeholder-slate-400 text-sm" placeholder="Masukkan Username..." onKeyDown={e => e.key === 'Enter' && handleLoginClick(e.target.value)} />
+              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200/50 transition-all transform active:scale-95 text-sm">Masuk Sistem</button>
+            </div>
+          </div>
+        </div>
+      );
+
+      // GUARD SYNCING SCREEN
+      if (!isDataReady) return (
+        <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
+          <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
+            <i className="fas fa-circle-notch fa-spin text-4xl text-blue-600 mb-6"></i>
+            <p className="font-bold text-slate-800 text-lg">Memuat Dashboard...</p>
+            <p className="text-sm text-slate-500 font-medium">Menyiapkan data presensi...</p>
+          </div>
+        </div>
+      );
 
       return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
