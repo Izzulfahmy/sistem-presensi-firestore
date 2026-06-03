@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Presensi</title>
   
+  <link rel="icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
+  <link rel="shortcut icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
+  
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -344,11 +347,41 @@
               useTime: s.hasOwnProperty('useTime') ? String(s.useTime).toLowerCase() : 'true',
             };
 
+            // AUTO-ALPA CHECK LOGIC
+            const now = new Date();
+            const currentYYYYMMDD = getLocalYYYYMMDD(now);
+            const currentHm = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+            
+            let processedAtt = a.map(record => {
+                if (record.status === 'Menunggu') {
+                    let shouldBeAlpa = false;
+                    if (record.date < currentYYYYMMDD) {
+                        shouldBeAlpa = true;
+                    } else if (record.date === currentYYYYMMDD) {
+                        const pH = parseInt((finalSettings.jamPulang || '17:00').split(':')[0]);
+                        const pMin = parseInt((finalSettings.jamPulang || '17:00').split(':')[1]);
+                        const cH = parseInt(currentHm.split(':')[0]);
+                        const cMin = parseInt(currentHm.split(':')[1]);
+                        
+                        // Jika sudah melebihi batas jam pulang
+                        if (cH > pH || (cH === pH && cMin >= pMin)) {
+                            shouldBeAlpa = true;
+                        }
+                    }
+                    if (shouldBeAlpa) {
+                        // Update ke Firestore di background
+                        window.fs.updateDoc(window.fs.doc(window.db, "attendance", record.id.toString()), { status: 'Alpa' }).catch(console.error);
+                        return { ...record, status: 'Alpa' };
+                    }
+                }
+                return record;
+            });
+
             setSettingsDb(finalSettings);
             setUsersDb(u);
             setHolidaysDb(h);
             setVerificationsDb(v);
-            setAttendanceDb(a);
+            setAttendanceDb(processedAtt);
             
             const savedUserStr = localStorage.getItem('presensi_user');
             if (savedUserStr) {
@@ -518,6 +551,7 @@
                   <option value="Izin" ${record.status === 'Izin' ? 'selected' : ''}>Izin</option>
                   <option value="Sakit" ${record.status === 'Sakit' ? 'selected' : ''}>Sakit</option>
                   <option value="Alpa" ${record.status === 'Alpa' ? 'selected' : ''}>Alpa</option>
+                  <option value="Menunggu" ${record.status === 'Menunggu' ? 'selected' : ''}>Menunggu (Kosong)</option>
                 </select>
               </div>
               <div class="flex gap-3">
@@ -556,6 +590,23 @@
         });
       };
 
+      // FUNGSI HELPER: Pastikan semua client lain dibuatkan status "Menunggu"
+      const ensureAllClientsHaveRecord = async (todayStr, skipUserId) => {
+          const clients = usersDb.filter(u => u.role === 'client');
+          let additions = [];
+          for (const client of clients) {
+              if (client.id === skipUserId) continue;
+              const hasRec = attendanceDb.some(a => a.userId === client.id && a.date === todayStr) || additions.some(a => a.userId === client.id);
+              if (!hasRec) {
+                  const pRec = { id: Date.now() + client.id, userId: client.id, date: todayStr, timeIn: '-', timeOut: '-', status: 'Menunggu' };
+                  additions.push(pRec);
+                  // Simpan ke Firestore (jalan di background agar cepat)
+                  window.fs.setDoc(window.fs.doc(window.db, "attendance", pRec.id.toString()), pRec).catch(e => console.error(e));
+              }
+          }
+          return additions;
+      }
+
       const performPresensi = async (tipe) => {
         const todayStr = getLocalYYYYMMDD(currentTime);
         const day = currentTime.getDay();
@@ -567,22 +618,42 @@
 
         const executePresensi = async () => {
           const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
           if (tipe === 'masuk') {
             let late = false;
             if (String(settingsDb.useTime).toLowerCase() === 'true') {
               const b = settingsDb.jamMasuk.split(':'), a = time.split(':');
               late = parseInt(a[0]) > parseInt(b[0]) || (a[0] === b[0] && parseInt(a[1]) > parseInt(b[1]));
             }
-            const rec = { id: Date.now(), userId: user.id, date: todayStr, timeIn: time, timeOut: null, status: late ? 'Terlambat' : 'Hadir' };
-            await window.fs.setDoc(window.fs.doc(window.db, "attendance", rec.id.toString()), rec);
-            setAttendanceDb([...attendanceDb, rec]);
+            
+            let existingUserRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr);
+            let updatedRec;
+
+            if (existingUserRec) {
+                updatedRec = { ...existingUserRec, timeIn: time, status: late ? 'Terlambat' : 'Hadir' };
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), { timeIn: time, status: updatedRec.status });
+            } else {
+                updatedRec = { id: Date.now(), userId: user.id, date: todayStr, timeIn: time, timeOut: null, status: late ? 'Terlambat' : 'Hadir' };
+                await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
+            }
+
+            // Draf otomatis untuk user lain (Menunggu)
+            const newPlaceholders = await ensureAllClientsHaveRecord(todayStr, user.id);
+            
+            const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
+            setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
+
             Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          
           } else {
-            const up = attendanceDb.map(r => r.userId === user.id && r.date === todayStr ? {...r, timeOut: time} : r);
-            setAttendanceDb(up);
-            const id = attendanceDb.find(r => r.userId === user.id && r.date === todayStr).id;
-            await window.fs.updateDoc(window.fs.doc(window.db, "attendance", id.toString()), { timeOut: time });
-            Swal.fire({ icon: 'success', title: 'Berhasil Pulang', text: `Sampai jumpa! Dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            // Logika Pulang
+            const activeRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr && a.status !== 'Menunggu');
+            if(activeRec) {
+                const up = attendanceDb.map(r => r.id === activeRec.id ? {...r, timeOut: time} : r);
+                setAttendanceDb(up);
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", activeRec.id.toString()), { timeOut: time });
+                Swal.fire({ icon: 'success', title: 'Berhasil Pulang', text: `Sampai jumpa! Dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            }
           }
         };
 
@@ -614,9 +685,24 @@
         }).then(async res => {
           if (res.isConfirmed) {
             const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const rec = { id: Date.now(), userId: user.id, date: todayStr, timeIn: time, timeOut: '-', status: tipe };
-            await window.fs.setDoc(window.fs.doc(window.db, "attendance", rec.id.toString()), rec);
-            setAttendanceDb([...attendanceDb, rec]);
+            
+            let existingUserRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr);
+            let updatedRec;
+
+            if (existingUserRec) {
+                updatedRec = { ...existingUserRec, timeIn: time, timeOut: '-', status: tipe };
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), { timeIn: time, timeOut: '-', status: tipe });
+            } else {
+                updatedRec = { id: Date.now(), userId: user.id, date: todayStr, timeIn: time, timeOut: '-', status: tipe };
+                await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
+            }
+
+            // Draf otomatis untuk user lain
+            const newPlaceholders = await ensureAllClientsHaveRecord(todayStr, user.id);
+            
+            const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
+            setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
+
             Swal.fire({ icon: 'success', title: 'Berhasil', text: `Status ${tipe} berhasil dicatat.`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
         });
@@ -629,7 +715,6 @@
             const uniqueChars = Math.random().toString(36).substring(2, 8).toUpperCase();
             const vid = filterMonth.replace('-', '') + '-' + uniqueChars;
             
-            // Generate link pointing to verification.html on your Github Pages
             let currentUrl = window.location.href.split('?')[0];
             let cleanBase = currentUrl.endsWith('/') ? currentUrl + 'verification.html' : currentUrl.replace('index.html', 'verification.html');
             if(settingsDb.appScriptUrl) cleanBase = settingsDb.appScriptUrl.trim().replace(/\/$/, "");
@@ -720,7 +805,8 @@
                         if (record.status === 'Hadir' || record.status === 'Terlambat') { row.push(record.status === 'Hadir' ? 'H' : 'T'); totalHadir++; }
                         else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
                         else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
-                        else { row.push(''); }
+                        else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
+                        else { row.push(''); } // Untuk 'Menunggu', dibiarkan kosong
                       } else {
                         if (isRoutineHoliday || isSpecialHoliday) row.push('L');
                         else {
@@ -916,28 +1002,10 @@
         }
       };
 
-      if (!user) return (
-        <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
-          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-          
-          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-sm border border-slate-100 relative z-10">
-            <div className="text-center mb-8">
-              <div className="bg-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 shadow-blue-200 shadow-xl">
-                <i className="fas fa-fingerprint text-white text-4xl -rotate-3"></i>
-              </div>
-              <h1 className="text-2xl font-bold text-slate-800 tracking-tight leading-tight">{settingsDb.namaInstansi}</h1>
-              <p className="text-slate-400 mt-1 font-semibold uppercase tracking-widest text-[10px]">Sistem Presensi</p>
-            </div>
-            <div className="space-y-5">
-              <input type="text" id="logU" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all font-semibold text-slate-700 placeholder-slate-400 text-sm" placeholder="Masukkan Username..." onKeyDown={e => e.key === 'Enter' && handleLoginClick(e.target.value)} />
-              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200/50 transition-all transform active:scale-95 text-sm">Masuk Sistem</button>
-            </div>
-          </div>
-        </div>
-      );
-
-      const todayRec = attendanceDb.find(a => a.userId === user.id && a.date === getLocalYYYYMMDD(currentTime));
+      const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
+      // Hanya jadikan aktif jika statusnya BUKAN Menunggu
+      const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
+      
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
@@ -947,7 +1015,6 @@
           
           <nav className="lg:hidden w-full bg-slate-900 text-white p-3 shadow-xl z-30 shrink-0">
             <div className="flex items-center justify-between mb-3 px-2 border-b border-slate-800 pb-3">
-               
                <div className="flex items-center space-x-2.5">
                  <div className="bg-blue-600 p-2 rounded-lg shadow-inner shadow-blue-400/20">
                    <i className="fas fa-fingerprint text-xs text-white"></i>
@@ -961,14 +1028,10 @@
                    <p className="text-[8px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{user.role}</p>
                  </div>
                  
-                 <button 
-                   onClick={handleLogout} 
-                   className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm shrink-0"
-                 >
+                 <button onClick={handleLogout} className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm shrink-0">
                    <i className="fas fa-power-off text-xs"></i>
                    <span className="text-[9px] font-bold uppercase tracking-wider">Keluar</span>
                  </button>
-
                </div>
             </div>
             <div className={`grid gap-1 ${user.role === 'admin' ? 'grid-cols-5' : 'grid-cols-3'}`}>
@@ -1039,52 +1102,35 @@
             <div className="p-4 md:p-8 max-w-6xl mx-auto min-h-full">
               
               <header className="flex flex-col md:flex-row md:justify-between items-start md:items-end mb-8 space-y-5 md:space-y-0">
-                
                 <div className="w-full md:w-auto flex flex-col">
-                  
                   <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight capitalize leading-none">
                     {activeMenu.replace('-', ' ')}
                   </h1>
                   
                   <div className="mt-4 bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 shadow-sm inline-block w-full md:w-auto">
                     <div className="flex flex-col gap-y-0.5">
-                      
                       {settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '' && (
                         <div className="flex items-center text-blue-600">
-                          <div className="w-5 flex justify-center shrink-0 opacity-80 mr-2">
-                            <i className="fas fa-briefcase text-xs"></i>
-                          </div>
-                          <h2 className="text-[11px] md:text-xs font-bold uppercase tracking-widest leading-none pt-0.5">
-                            {settingsDb.namaKegiatan}
-                          </h2>
+                          <div className="w-5 flex justify-center shrink-0 opacity-80 mr-2"><i className="fas fa-briefcase text-xs"></i></div>
+                          <h2 className="text-[11px] md:text-xs font-bold uppercase tracking-widest leading-none pt-0.5">{settingsDb.namaKegiatan}</h2>
                         </div>
                       )}
-
                       {settingsDb.namaInstansi && settingsDb.namaInstansi.trim() !== '' && (
                         <div className="flex items-center text-slate-800">
-                          <div className="w-5 flex justify-center shrink-0 opacity-80 mr-2">
-                            <i className="fas fa-map-marker-alt text-xs"></i>
-                          </div>
-                          <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest leading-none pt-0.5">
-                            {settingsDb.namaInstansi}
-                          </p>
+                          <div className="w-5 flex justify-center shrink-0 opacity-80 mr-2"><i className="fas fa-map-marker-alt text-xs"></i></div>
+                          <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest leading-none pt-0.5">{settingsDb.namaInstansi}</p>
                         </div>
                       )}
-                      
                     </div>
                   </div>
-                  
                 </div>
                 
                 <div className="w-full md:w-auto bg-white px-4 py-3 md:px-5 md:py-3.5 rounded-xl md:rounded-2xl shadow-sm border border-slate-200 flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center">
-                  <div className="text-xl sm:text-2xl md:text-3xl font-black text-blue-600 tabular-nums tracking-tight">
-                    {currentTime.toLocaleTimeString('id-ID')}
-                  </div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-black text-blue-600 tabular-nums tracking-tight">{currentTime.toLocaleTimeString('id-ID')}</div>
                   <div className="text-[15px] sm:text-[10px] md:text-xs font-bold text-slate-800 uppercase tracking-wider md:mt-1 text-right">
                     {currentTime.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}
                   </div>
                 </div>
-
               </header>
 
               {activeMenu === 'kalender' && (
@@ -1109,21 +1155,18 @@
                     </div>
                     <h2 className="text-2xl font-bold text-slate-800 mb-4 relative z-10">Presensi Digital PPL</h2>
                     <div className="flex flex-col items-center space-y-2.5 mb-8 relative z-10">
-                      
                       <div className="text-slate-700 font-bold text-sm sm:text-base flex items-center bg-white px-4 py-1.5 rounded-full border border-slate-200 shadow-sm">
                         <i className="fas fa-user-circle mr-2 text-blue-500 text-lg"></i>
                         {user.name}
                       </div>
-                      
                       <div className="text-slate-500 font-medium text-xs flex items-center bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
                         <i className="fas fa-building mr-1.5 text-slate-400"></i>
                         {settingsDb.namaInstansi}
                       </div>
-                      
                     </div>
                     
                     <div className="w-full relative z-10">
-                      {!todayRec ? (
+                      {!activeRec ? (
                         <div className="flex flex-col space-y-3">
                           <button onClick={() => performPresensi('masuk')} disabled={isLocating} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-blue-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center">
                             <i className="fas fa-sign-in-alt mr-2"></i> Presensi Sekarang
@@ -1137,13 +1180,13 @@
                             </button>
                           </div>
                         </div>
-                      ) : !todayRec.timeOut && !['Izin', 'Sakit'].includes(todayRec.status) ? (
+                      ) : !activeRec.timeOut && !['Izin', 'Sakit', 'Alpa'].includes(activeRec.status) ? (
                         <button onClick={() => performPresensi('pulang')} disabled={isLocating} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-orange-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center">
                           <i className="fas fa-sign-out-alt mr-2"></i> Pulang Sekarang
                         </button>
                       ) : (
                         <div className="w-full bg-green-50 text-green-700 p-4 rounded-xl font-bold border border-green-200 flex items-center justify-center space-x-2 text-base">
-                          <i className="fas fa-check-circle text-xl"></i><span>Tugas Selesai / {todayRec.status}</span>
+                          <i className="fas fa-check-circle text-xl"></i><span>Tugas Selesai / {activeRec.status}</span>
                         </div>
                       )}
                     </div>
@@ -1154,23 +1197,23 @@
                     
                     <h3 className="text-xl font-bold mb-8 border-b border-slate-800 pb-4 relative z-10 flex items-center"><i className="fas fa-clipboard-check mr-3 text-blue-400"></i>Status Kehadiran</h3>
                     
-                    {todayRec ? (
+                    {activeRec ? (
                       <div className="space-y-6 relative z-10 flex-1 justify-center flex flex-col">
                         <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
                           <div className="space-y-1">
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-open mr-1.5 text-slate-500"></i>Jam Masuk</p>
-                            <p className="text-3xl font-black tabular-nums">{todayRec.timeIn}</p>
+                            <p className="text-3xl font-black tabular-nums">{activeRec.timeIn}</p>
                           </div>
-                          <span className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide shadow-md ${['Hadir', 'Terlambat'].includes(todayRec.status) ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}`}>
-                            {todayRec.status}
+                          <span className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide shadow-md ${['Hadir', 'Terlambat'].includes(activeRec.status) ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}`}>
+                            {activeRec.status}
                           </span>
                         </div>
                         <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
                           <div className="space-y-1">
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-closed mr-1.5 text-slate-500"></i>Jam Pulang</p>
-                            <p className="text-3xl font-black tabular-nums text-slate-300">{todayRec.timeOut || '--:--'}</p>
+                            <p className="text-3xl font-black tabular-nums text-slate-300">{activeRec.timeOut || '--:--'}</p>
                           </div>
-                          {todayRec.timeOut ? (
+                          {activeRec.timeOut ? (
                             <div className="bg-blue-500/20 p-2.5 rounded-lg border border-blue-500/30"><i className="fas fa-check text-xl text-blue-400"></i></div>
                           ) : (
                             <span className="text-[10px] font-bold text-orange-400 animate-pulse bg-orange-500/10 px-3 py-1.5 rounded-md border border-orange-500/20">Menunggu</span>
@@ -1210,7 +1253,10 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeIn}</td>
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
-                                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider 
+                                  ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' 
+                                  : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  : 'bg-red-100 text-red-700 border border-red-200'}`}>
                                    {record.status}
                                  </span>
                                </td>
@@ -1374,7 +1420,10 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeIn}</td>
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
-                                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir','Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>
+                                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider 
+                                  ${['Hadir','Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' 
+                                  : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>
                                    {record.status}
                                  </span>
                                </td>
