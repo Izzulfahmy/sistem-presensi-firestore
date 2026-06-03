@@ -937,16 +937,6 @@
         </div>
       );
 
-      if (!isDataReady) return (
-        <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
-          <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
-            <i className="fas fa-circle-notch fa-spin text-4xl text-blue-600 mb-6"></i>
-            <p className="font-bold text-slate-800 text-lg">Memuat Dashboard...</p>
-            <p className="text-sm text-slate-500 font-medium">Sinkronisasi data...</p>
-          </div>
-        </div>
-      );
-
       const todayRec = attendanceDb.find(a => a.userId === user.id && a.date === getLocalYYYYMMDD(currentTime));
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
