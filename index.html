@@ -916,15 +916,6 @@
         }
       };
 
-      if (isLoading) return (
-        <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
-          <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center">
-            <i className="fas fa-satellite-dish fa-spin text-4xl text-blue-600 mb-4"></i>
-            <p className="font-bold text-slate-800 text-base">Menghubungkan Database...</p>
-          </div>
-        </div>
-      );
-
       if (!user) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
