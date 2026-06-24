@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verifikasi Laporan Presensi</title>
   
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.23.12/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" crossorigin="anonymous"></script>
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   
@@ -47,12 +48,10 @@
 <body class="bg-slate-100 text-slate-800 font-sans antialiased selection:bg-blue-200">
   
   <script>
-    // Membaca parameter dari URL statis (misal: ?vid=202606-ABCDEF atau ?month=2026-06)
     const urlParams = new URLSearchParams(window.location.search);
     let targetMonthParam = urlParams.get('month') || "";
     const vidParam = urlParams.get('vid');
     
-    // Jika ada vid (202606-ABCDEF), kita ekstrak bulannya menjadi 2026-06
     if (!targetMonthParam && vidParam && vidParam.length >= 6) {
        targetMonthParam = vidParam.substring(0, 4) + '-' + vidParam.substring(4, 6);
     }
@@ -62,7 +61,7 @@
 
   <div id="root"></div>
 
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react,env">
     const { useState, useEffect } = React;
 
     function getLocalYYYYMMDD(dateObj) {
@@ -136,7 +135,6 @@
       try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
       if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: 'Belum Diatur', nip: '-'}];
 
-      // --- LOGIKA MAPPING TATA LETAK PJ SEPERTI PDF ---
       const nPjs = pjs.length;
       let htmlRows = [];
       let pjsIndex = 0;
@@ -164,7 +162,6 @@
               <p className="text-[10px] font-bold text-slate-600 mt-1">{pj.nip && pj.nip !== '-' ? pj.nip : '\u00A0'}</p>
           </div>
       );
-      // ------------------------------------------------
 
       const addressParts = [
         settingsDb.alamat,
@@ -174,7 +171,6 @@
         settingsDb.kodePos
       ].filter(Boolean).join(', ');
 
-      // Memastikan ID Dokumen ditampilkan dengan benar, dari URL jika ada
       const displayVid = window.VID_PARAM !== "-" ? window.VID_PARAM : `${year}${monthStr}-XXXXXXXX`;
 
       return (
@@ -271,7 +267,6 @@
                         return {val: '', color: ''};
                       } else {
                         if (isRoutineHoliday || isSpecialHoliday) return {val: 'L', color: 'bg-red-500 text-white font-bold'};
-                        // Jika hari berlalu dan tidak ada rekam jejak
                         if (dayDate <= new Date() && hasActivityOnDate) { totalA++; return {val: 'A', color: 'text-red-600 font-bold bg-red-50/50'}; }
                         return {val: '', color: ''};
                       }

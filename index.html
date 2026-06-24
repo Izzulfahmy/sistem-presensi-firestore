@@ -8,9 +8,10 @@
   <link rel="icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   <link rel="shortcut icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.23.12/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" crossorigin="anonymous"></script>
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -58,7 +59,8 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
   <div id="root"></div>
-  <script type="text/babel">
+  
+  <script type="text/babel" data-presets="react,env">
     const { useState, useEffect, useMemo } = React;
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -278,13 +280,23 @@
       const [isLocating, setIsLocating] = useState(false); 
       const [isSavingSettings, setIsSavingSettings] = useState(false); 
       
+      // Mengamankan akses localStorage
       const [user, setUser] = useState(() => {
-        const savedUser = localStorage.getItem('presensi_user');
-        try { return savedUser ? JSON.parse(savedUser) : null; } catch(e) { return null; }
+        try {
+          const savedUser = localStorage.getItem('presensi_user');
+          return savedUser ? JSON.parse(savedUser) : null; 
+        } catch(e) { 
+          return null; 
+        }
       }); 
       
+      // Mengamankan akses localStorage
       const [activeMenu, setActiveMenu] = useState(() => {
-        return localStorage.getItem('presensi_menu') || 'dashboard';
+        try {
+          return localStorage.getItem('presensi_menu') || 'dashboard';
+        } catch(e) {
+          return 'dashboard';
+        }
       });
       
       const [filterMonth, setFilterMonth] = useState(() => {
@@ -347,7 +359,6 @@
               useTime: s.hasOwnProperty('useTime') ? String(s.useTime).toLowerCase() : 'true',
             };
 
-            // AUTO-ALPA CHECK LOGIC
             const now = new Date();
             const currentYYYYMMDD = getLocalYYYYMMDD(now);
             const currentHm = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
@@ -363,13 +374,11 @@
                         const cH = parseInt(currentHm.split(':')[0]);
                         const cMin = parseInt(currentHm.split(':')[1]);
                         
-                        // Jika sudah melebihi batas jam pulang
                         if (cH > pH || (cH === pH && cMin >= pMin)) {
                             shouldBeAlpa = true;
                         }
                     }
                     if (shouldBeAlpa) {
-                        // Update ke Firestore di background
                         window.fs.updateDoc(window.fs.doc(window.db, "attendance", record.id.toString()), { status: 'Alpa' }).catch(console.error);
                         return { ...record, status: 'Alpa' };
                     }
@@ -383,7 +392,12 @@
             setVerificationsDb(v);
             setAttendanceDb(processedAtt);
             
-            const savedUserStr = localStorage.getItem('presensi_user');
+            // Mengamankan akses localStorage
+            let savedUserStr = null;
+            try {
+              savedUserStr = localStorage.getItem('presensi_user');
+            } catch(e) {}
+
             if (savedUserStr) {
                try {
                   const parsed = JSON.parse(savedUserStr);
@@ -391,7 +405,7 @@
                   if(validUser){
                       setUser(validUser);
                   } else {
-                      localStorage.removeItem('presensi_user');
+                      try { localStorage.removeItem('presensi_user'); } catch(e) {}
                   }
                } catch(e) {}
             }
@@ -417,7 +431,7 @@
 
       const changeMenu = (menuName) => {
         setActiveMenu(menuName);
-        localStorage.setItem('presensi_menu', menuName);
+        try { localStorage.setItem('presensi_menu', menuName); } catch(e) {}
       };
 
       const handleLoginClick = async (username) => {
@@ -439,7 +453,7 @@
           if (found) {
             setUsersDb(currentUsers);
             setUser(found);
-            localStorage.setItem('presensi_user', JSON.stringify(found));
+            try { localStorage.setItem('presensi_user', JSON.stringify(found)); } catch(e) {}
             Swal.fire({ icon: 'success', title: 'Berhasil!', text: `Selamat datang, ${found.name}`, timer: 1200, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } }).then(() => changeMenu('dashboard'));
           } else {
             Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Username tidak terdaftar.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
@@ -462,8 +476,10 @@
         }).then((result) => {
           if (result.isConfirmed) {
             setUser(null);
-            localStorage.removeItem('presensi_user'); 
-            localStorage.removeItem('presensi_menu'); 
+            try {
+              localStorage.removeItem('presensi_user'); 
+              localStorage.removeItem('presensi_menu'); 
+            } catch(e) {}
           }
         });
       };
