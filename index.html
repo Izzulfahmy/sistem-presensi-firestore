@@ -317,14 +317,13 @@
 
       useEffect(() => {
         const initData = async () => {
-          // Fallback jika Firebase gagal total terhubung
           if (!window.db || !window.fs) {
-            console.warn("Firebase sdk is missing or block by policy rules.");
+            console.warn("Firebase SDK tidak terdeteksi atau diblokir.");
             Swal.fire({
               icon: 'error',
               title: 'Database Terputus',
-              text: 'Gagal terhubung ke Firestore. Periksa aturan keamanan Firestore atau koneksi internet Anda.',
-              confirmButtonText: 'Tetap Masuk (Offline Mode)'
+              text: 'Gagal terhubung ke Firestore. Mengaktifkan Mode Offline.',
+              confirmButtonText: 'Lanjutkan'
             });
             setIsDataReady(true);
             setIsLoading(false);
@@ -371,7 +370,6 @@
               useTime: s.hasOwnProperty('useTime') ? String(s.useTime).toLowerCase() : 'true',
             };
 
-            // AUTO-ALPA CHECK LOGIC
             const now = new Date();
             const currentYYYYMMDD = getLocalYYYYMMDD(now);
             const currentHm = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
@@ -421,9 +419,8 @@
             setIsDataReady(true);
             setIsLoading(false);
           } catch (error) {
-            console.error("Firestore error payload load sync:", error);
-            Swal.fire('Sinkronisasi Gagal', 'Gagal memuat pangkalan data Firestore. Menjalankan mode offline.', 'warning');
-            setIsDataReady(true);
+            console.error(error);
+            Swal.fire('Koneksi Gagal', 'Gagal memuat database Firestore.', 'error');
             setIsLoading(false);
           }
         };
@@ -450,14 +447,13 @@
         }
 
         if (!window.db || !window.fs) {
-          // Offline / Guard Login Bypass Local jika data crash
           if(username === 'admin') {
              const mockAdmin = { id: 1, name: 'Offline Admin', username: 'admin', role: 'admin', nim: 'HRD' };
              setUser(mockAdmin);
              localStorage.setItem('presensi_user', JSON.stringify(mockAdmin));
              changeMenu('dashboard');
           } else {
-             Swal.fire('Mode Offline', 'Hanya user "admin" yang dapat mengakses sistem saat database terputus.', 'info');
+             Swal.fire('Mode Offline', 'Hanya admin offline yang diizinkan masuk saat database mati.', 'info');
           }
           return;
         }
@@ -507,7 +503,7 @@
       const handleAddUser = async (e) => {
         e.preventDefault();
         if(!newUser.name || !newUser.username) return;
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         const added = { ...newUser, id: Date.now(), role: 'client' };
         
         await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
@@ -517,7 +513,7 @@
       };
 
       const handleEditUser = (clientObj) => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         Swal.fire({
           title: '<h2 class="text-xl font-bold text-slate-800">Update Data Client</h2>',
           html: `
@@ -556,7 +552,7 @@
           }
         }).then(async (result) => {
           if (result.isConfirmed) {
-            await window.fs.setDoc(window.fs.doc(window.db, "result.value.id.toString()"), result.value);
+            await window.fs.setDoc(window.fs.doc(window.db, "users", result.value.id.toString()), result.value);
             setUsersDb(prev => prev.map(u => u.id === clientObj.id ? result.value : u));
             Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Data client diperbarui.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
@@ -564,7 +560,7 @@
       };
 
       const handleDeleteUser = (id) => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         Swal.fire({
           title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan!", icon: 'warning',
           showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
@@ -578,7 +574,7 @@
       };
 
       const handleEditAttendance = (record) => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         Swal.fire({
           title: '<h2 class="text-xl font-bold text-slate-800">Update Presensi</h2>',
           html: `
@@ -619,7 +615,7 @@
       };
 
       const handleDeleteAttendance = (id) => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         Swal.fire({
           title: 'Hapus Presensi?', text: "Data tidak dapat dikembalikan!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
         }).then(async (result) => {
@@ -648,7 +644,7 @@
       }
 
       const performPresensi = async (tipe) => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         const todayStr = getLocalYYYYMMDD(currentTime);
         const day = currentTime.getDay();
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
@@ -709,7 +705,7 @@
       };
 
       const performIzinSakit = (tipe) => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
         const todayStr = getLocalYYYYMMDD(currentTime);
         const day = currentTime.getDay();
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
@@ -746,7 +742,7 @@
       };
 
       const handleGenerateVerif = async () => {
-         if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
+         if (!window.db || !window.fs) return Swal.fire('Error', 'Database tidak tersedia offline', 'error');
          Swal.fire({html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan Tautan Unik...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }});
          
          try {
@@ -1067,7 +1063,7 @@
             </div>
             <div className="space-y-5">
               <input type="text" id="logU" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all font-semibold text-slate-700 placeholder-slate-400 text-sm" placeholder="Masukkan Username..." onKeyDown={e => e.key === 'Enter' && handleLoginClick(e.target.value)} />
-              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200/50 transition-all transform active:scale-[0.98] text-sm">Masuk Sistem</button>
+              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200/50 transition-all transform active:scale-95 text-sm">Masuk Sistem</button>
             </div>
           </div>
         </div>
@@ -1102,7 +1098,7 @@
                    <p className="text-[8px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{user.role}</p>
                  </div>
                  
-                 <button onClick={handleLogout} className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-[0.98] shadow-sm shrink-0">
+                 <button onClick={handleLogout} className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm shrink-0">
                    <i className="fas fa-power-off text-xs"></i>
                    <span className="text-[9px] font-bold uppercase tracking-wider">Keluar</span>
                  </button>
