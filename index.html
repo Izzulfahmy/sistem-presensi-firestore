@@ -40,20 +40,25 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
-      authDomain: "sistem-presensi-96dae.firebaseapp.com",
-      projectId: "sistem-presensi-96dae",
-      storageBucket: "sistem-presensi-96dae.firebasestorage.app",
-      messagingSenderId: "444659307342",
-      appId: "1:444659307342:web:b1f8b7833f76a43ec8c41f",
-      measurementId: "G-XDXXMENG8X"
-    };
+    try {
+      const firebaseConfig = {
+        apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
+        authDomain: "sistem-presensi-96dae.firebaseapp.com",
+        projectId: "sistem-presensi-96dae",
+        storageBucket: "sistem-presensi-96dae.firebasestorage.app",
+        messagingSenderId: "444659307342",
+        appId: "1:444659307342:web:b1f8b7833f76a43ec8c41f",
+        measurementId: "G-XDXXMENG8X"
+      };
 
-    const app = initializeApp(firebaseConfig);
-    window.db = getFirestore(app);
-    window.fs = { collection, getDocs, setDoc, doc, deleteDoc, updateDoc };
-    window.dispatchEvent(new Event('firebase-ready'));
+      const app = initializeApp(firebaseConfig);
+      window.db = getFirestore(app);
+      window.fs = { collection, getDocs, setDoc, doc, deleteDoc, updateDoc };
+    } catch (e) {
+      console.error("Firebase Initialization Error: ", e);
+    } finally {
+      window.dispatchEvent(new Event('firebase-ready'));
+    }
   </script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
@@ -104,6 +109,10 @@
       const handleDateClick = async (date) => {
         if (userRole !== 'admin') return;
         if (!date) return;
+        if (!window.db || !window.fs) {
+          Swal.fire('Error', 'Koneksi database tidak tersedia', 'error');
+          return;
+        }
         const dateStr = getLocalYYYYMMDD(date);
         const existing = holidaysDb.find(h => h.date === dateStr);
 
@@ -146,6 +155,7 @@
       };
 
       const handleSaveRoutineSettings = async () => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Koneksi database tidak tersedia', 'error');
         setIsSavingSettings(true);
         try {
           await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), settingsDb);
@@ -299,7 +309,7 @@
       
       const [settingsDb, setSettingsDb] = useState({
         namaKegiatan: '',
-        namaInstansi: 'Memuat...', lokasi: '', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', penanggungJawab: '[]',
+        namaInstansi: 'Sistem Presensi', lokasi: '', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', penanggungJawab: '[]',
         useLocation: 'true', useTime: 'true', alamat: '', desaKecamatan: '', kotaKabupaten: '', negara: 'Indonesia', kodePos: '', appScriptUrl: ''
       });
       const [currentTime, setCurrentTime] = useState(new Date());
@@ -307,6 +317,20 @@
 
       useEffect(() => {
         const initData = async () => {
+          // Fallback jika Firebase gagal total terhubung
+          if (!window.db || !window.fs) {
+            console.warn("Firebase sdk is missing or block by policy rules.");
+            Swal.fire({
+              icon: 'error',
+              title: 'Database Terputus',
+              text: 'Gagal terhubung ke Firestore. Periksa aturan keamanan Firestore atau koneksi internet Anda.',
+              confirmButtonText: 'Tetap Masuk (Offline Mode)'
+            });
+            setIsDataReady(true);
+            setIsLoading(false);
+            return;
+          }
+
           try {
             const [usersSnap, attSnap, holSnap, verSnap, setSnap] = await Promise.all([
               window.fs.getDocs(window.fs.collection(window.db, "users")),
@@ -363,13 +387,11 @@
                         const cH = parseInt(currentHm.split(':')[0]);
                         const cMin = parseInt(currentHm.split(':')[1]);
                         
-                        // Jika sudah melebihi batas jam pulang
                         if (cH > pH || (cH === pH && cMin >= pMin)) {
                             shouldBeAlpa = true;
                         }
                     }
                     if (shouldBeAlpa) {
-                        // Update ke Firestore di background
                         window.fs.updateDoc(window.fs.doc(window.db, "attendance", record.id.toString()), { status: 'Alpa' }).catch(console.error);
                         return { ...record, status: 'Alpa' };
                     }
@@ -399,8 +421,9 @@
             setIsDataReady(true);
             setIsLoading(false);
           } catch (error) {
-            console.error(error);
-            Swal.fire('Koneksi Gagal', 'Gagal memuat database Firestore.', 'error');
+            console.error("Firestore error payload load sync:", error);
+            Swal.fire('Sinkronisasi Gagal', 'Gagal memuat pangkalan data Firestore. Menjalankan mode offline.', 'warning');
+            setIsDataReady(true);
             setIsLoading(false);
           }
         };
@@ -424,6 +447,19 @@
         if (!username) {
            Swal.fire({ icon: 'warning', title: 'Peringatan', text: 'Username tidak boleh kosong!', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
            return;
+        }
+
+        if (!window.db || !window.fs) {
+          // Offline / Guard Login Bypass Local jika data crash
+          if(username === 'admin') {
+             const mockAdmin = { id: 1, name: 'Offline Admin', username: 'admin', role: 'admin', nim: 'HRD' };
+             setUser(mockAdmin);
+             localStorage.setItem('presensi_user', JSON.stringify(mockAdmin));
+             changeMenu('dashboard');
+          } else {
+             Swal.fire('Mode Offline', 'Hanya user "admin" yang dapat mengakses sistem saat database terputus.', 'info');
+          }
+          return;
         }
 
         Swal.fire({
@@ -471,6 +507,7 @@
       const handleAddUser = async (e) => {
         e.preventDefault();
         if(!newUser.name || !newUser.username) return;
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         const added = { ...newUser, id: Date.now(), role: 'client' };
         
         await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
@@ -480,6 +517,7 @@
       };
 
       const handleEditUser = (clientObj) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         Swal.fire({
           title: '<h2 class="text-xl font-bold text-slate-800">Update Data Client</h2>',
           html: `
@@ -518,7 +556,7 @@
           }
         }).then(async (result) => {
           if (result.isConfirmed) {
-            await window.fs.setDoc(window.fs.doc(window.db, "users", result.value.id.toString()), result.value);
+            await window.fs.setDoc(window.fs.doc(window.db, "result.value.id.toString()"), result.value);
             setUsersDb(prev => prev.map(u => u.id === clientObj.id ? result.value : u));
             Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Data client diperbarui.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
@@ -526,6 +564,7 @@
       };
 
       const handleDeleteUser = (id) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         Swal.fire({
           title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan!", icon: 'warning',
           showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
@@ -539,6 +578,7 @@
       };
 
       const handleEditAttendance = (record) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         Swal.fire({
           title: '<h2 class="text-xl font-bold text-slate-800">Update Presensi</h2>',
           html: `
@@ -579,6 +619,7 @@
       };
 
       const handleDeleteAttendance = (id) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         Swal.fire({
           title: 'Hapus Presensi?', text: "Data tidak dapat dikembalikan!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
         }).then(async (result) => {
@@ -591,6 +632,7 @@
       };
 
       const ensureAllClientsHaveRecord = async (todayStr, skipUserId) => {
+          if (!window.db || !window.fs) return [];
           const clients = usersDb.filter(u => u.role === 'client');
           let additions = [];
           for (const client of clients) {
@@ -606,6 +648,7 @@
       }
 
       const performPresensi = async (tipe) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         const todayStr = getLocalYYYYMMDD(currentTime);
         const day = currentTime.getDay();
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
@@ -666,6 +709,7 @@
       };
 
       const performIzinSakit = (tipe) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
         const todayStr = getLocalYYYYMMDD(currentTime);
         const day = currentTime.getDay();
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
@@ -702,6 +746,7 @@
       };
 
       const handleGenerateVerif = async () => {
+         if (!window.db || !window.fs) return Swal.fire('Error', 'Fitur tidak tersedia offline', 'error');
          Swal.fire({html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan Tautan Unik...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }});
          
          try {
@@ -971,6 +1016,10 @@
 
         const currentVerif = verificationsDb.find(v => v.month === filterMonth);
         if (!currentVerif && filteredAttendanceData.length > 0) {
+           if (!window.db || !window.fs) {
+              proceedToPopup(null);
+              return;
+           }
            Swal.fire({html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan Tautan Unik...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }});
            try {
               const uniqueChars = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -996,7 +1045,6 @@
       };
 
       const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
-      // Hanya jadikan aktif jika statusnya BUKAN Menunggu
       const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
       
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
@@ -1014,7 +1062,7 @@
               <div className="bg-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 shadow-blue-200 shadow-xl">
                 <i className="fas fa-fingerprint text-white text-4xl -rotate-3"></i>
               </div>
-              <h1 className="text-2xl font-bold text-slate-800 tracking-tight leading-tight">{settingsDb.namaInstansi || 'Memuat...'}</h1>
+              <h1 className="text-2xl font-bold text-slate-800 tracking-tight leading-tight">{settingsDb.namaInstansi || 'Sistem Presensi'}</h1>
               <p className="text-slate-400 mt-1 font-semibold uppercase tracking-widest text-[10px]">Sistem Presensi</p>
             </div>
             <div className="space-y-5">

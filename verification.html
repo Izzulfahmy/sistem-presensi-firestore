@@ -28,31 +28,34 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
-      authDomain: "sistem-presensi-96dae.firebaseapp.com",
-      projectId: "sistem-presensi-96dae",
-      storageBucket: "sistem-presensi-96dae.firebasestorage.app",
-      messagingSenderId: "444659307342",
-      appId: "1:444659307342:web:b1f8b7833f76a43ec8c41f",
-      measurementId: "G-XDXXMENG8X"
-    };
+    try {
+      const firebaseConfig = {
+        apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
+        authDomain: "sistem-presensi-96dae.firebaseapp.com",
+        projectId: "sistem-presensi-96dae",
+        storageBucket: "sistem-presensi-96dae.firebasestorage.app",
+        messagingSenderId: "444659307342",
+        appId: "1:444659307342:web:b1f8b7833f76a43ec8c41f",
+        measurementId: "G-XDXXMENG8X"
+      };
 
-    const app = initializeApp(firebaseConfig);
-    window.db = getFirestore(app);
-    window.fs = { collection, getDocs };
-    window.dispatchEvent(new Event('firebase-ready'));
+      const app = initializeApp(firebaseConfig);
+      window.db = getFirestore(app);
+      window.fs = { collection, getDocs };
+    } catch (e) {
+      console.error("Firebase Verification Inits Error: ", e);
+    } finally {
+      window.dispatchEvent(new Event('firebase-ready'));
+    }
   </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased selection:bg-blue-200">
   
   <script>
-    // Membaca parameter dari URL statis (misal: ?vid=202606-ABCDEF atau ?month=2026-06)
     const urlParams = new URLSearchParams(window.location.search);
     let targetMonthParam = urlParams.get('month') || "";
     const vidParam = urlParams.get('vid');
     
-    // Jika ada vid (202606-ABCDEF), kita ekstrak bulannya menjadi 2026-06
     if (!targetMonthParam && vidParam && vidParam.length >= 6) {
        targetMonthParam = vidParam.substring(0, 4) + '-' + vidParam.substring(4, 6);
     }
@@ -90,6 +93,10 @@
 
       useEffect(() => {
         const initData = async () => {
+          if(!window.db || !window.fs) {
+             setIsLoading(false);
+             return;
+          }
           try {
             const [usersSnap, attSnap, holSnap, setSnap] = await Promise.all([
               window.fs.getDocs(window.fs.collection(window.db, "users")),
@@ -136,7 +143,6 @@
       try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
       if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: 'Belum Diatur', nip: '-'}];
 
-      // --- LOGIKA MAPPING TATA LETAK PJ SEPERTI PDF ---
       const nPjs = pjs.length;
       let htmlRows = [];
       let pjsIndex = 0;
@@ -164,7 +170,6 @@
               <p className="text-[10px] font-bold text-slate-600 mt-1">{pj.nip && pj.nip !== '-' ? pj.nip : '\u00A0'}</p>
           </div>
       );
-      // ------------------------------------------------
 
       const addressParts = [
         settingsDb.alamat,
@@ -174,7 +179,6 @@
         settingsDb.kodePos
       ].filter(Boolean).join(', ');
 
-      // Memastikan ID Dokumen ditampilkan dengan benar, dari URL jika ada
       const displayVid = window.VID_PARAM !== "-" ? window.VID_PARAM : `${year}${monthStr}-XXXXXXXX`;
 
       return (
@@ -271,7 +275,6 @@
                         return {val: '', color: ''};
                       } else {
                         if (isRoutineHoliday || isSpecialHoliday) return {val: 'L', color: 'bg-red-500 text-white font-bold'};
-                        // Jika hari berlalu dan tidak ada rekam jejak
                         if (dayDate <= new Date() && hasActivityOnDate) { totalA++; return {val: 'A', color: 'text-red-600 font-bold bg-red-50/50'}; }
                         return {val: '', color: ''};
                       }
