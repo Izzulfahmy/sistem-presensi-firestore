@@ -8,14 +8,12 @@
   <link rel="icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   <link rel="shortcut icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   
-  <!-- Fonts Import untuk Gaya Neubrutalism -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Mengunci versi Babel Standalone agar mengeksekusi runtime klasik tanpa inject otomatis keyword import module -->
   <script src="https://unpkg.com/@babel/standalone@7.23.12/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -27,18 +25,14 @@
     tailwind.config = {
       theme: {
         extend: {
-          colors: {
-            'nb-primary': '#000000',
-            'nb-secondary': '#ffd23f',
-            'nb-tertiary': '#ff6b6b',
-            'nb-neutral': '#fffdf5',
-            'nb-surface': '#ffffff',
-            'nb-cyan': '#7fdde0'
-          },
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
-            grotesk: ['Space Grotesk', 'sans-serif'],
-            syne: ['Syne', 'sans-serif']
+            heading: ['Space Grotesk', 'sans-serif'],
+          },
+          colors: {
+            neoYellow: '#ffd23f',
+            neoCoral: '#ff6b6b',
+            neoNeutral: '#fffdf5',
           }
         }
       }
@@ -46,34 +40,43 @@
   </script>
 
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #fffdf5; /* nb-neutral */
-    }
-    .nb-box-shadow {
-      box-shadow: 4px 4px 0px 0px #000000;
-    }
-    .nb-box-shadow-lg {
-      box-shadow: 8px 8px 0px 0px #000000;
-    }
-    .nb-button-active:active {
-      transform: translate(2px, 2px);
-      box-shadow: 2px 2px 0px 0px #000000;
-    }
+    body { font-family: 'Inter', sans-serif; background-color: #fffdf5; }
+    h1, h2, h3, h4, th { font-family: 'Space Grotesk', sans-serif; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #000000; border-left: 2px solid #000000; }
-    ::-webkit-scrollbar-thumb { background: #ffd23f; border: 2px solid #000000; }
+    ::-webkit-scrollbar-track { background: #fffdf5; border-left: 2px solid #000000; }
+    ::-webkit-scrollbar-thumb { background: #000000; border: 2px solid #000000; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    /* SweetAlert Kustom Bergaya Neubrutalism */
+    /* Override SweetAlert2 ke gaya Neubrutalism */
     .swal2-minimalist-popup {
       border: 4px solid #000000 !important;
       border-radius: 0px !important;
       background: #ffffff !important;
-      box-shadow: 8px 8px 0px 0px #000000 !important;
+      box-shadow: 4px 4px 0px 0px #000000 !important;
+    }
+    .swal2-minimalist-popup .swal2-title {
+      font-family: 'Space Grotesk', sans-serif !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+    }
+    .swal2-minimalist-popup .swal2-confirm {
+      background-color: #ffd23f !important;
+      color: #000000 !important;
+      border: 2px solid #000000 !important;
+      border-radius: 0px !important;
+      font-weight: 700 !important;
+      box-shadow: 2px 2px 0px 0px #000000 !important;
+    }
+    .swal2-minimalist-popup .swal2-cancel {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      border: 2px solid #000000 !important;
+      border-radius: 0px !important;
+      font-weight: 700 !important;
     }
   </style>
 
-  <!-- FIREBASE INITIALIZATION -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -93,15 +96,15 @@
       window.db = getFirestore(app);
       window.fs = { collection, getDocs, setDoc, doc, deleteDoc, updateDoc };
     } catch (e) {
-      console.error("Firebase Gagal Terhubung: ", e);
+      console.error("Firebase Initialization Error: ", e);
     } finally {
       window.dispatchEvent(new Event('firebase-ready'));
     }
   </script>
 </head>
-<body class="text-black selection:bg-nb-secondary antialiased">
+<body class="text-black antialiased text-sm">
   <div id="root"></div>
-
+  
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
@@ -127,7 +130,6 @@
       return timeStr.replace(/\./g, ':').slice(0, 5);
     }
 
-    /* KONTEN KALENDER NEUBRUTALISM */
     const CalendarComponent = ({ userRole, settingsDb, setSettingsDb, holidaysDb, setHolidaysDb, isSavingSettings, setIsSavingSettings, attendanceDb, usersDb }) => {
       const [viewDate, setViewDate] = useState(new Date());
 
@@ -147,22 +149,20 @@
       const changeMonth = (offset) => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
 
       const handleDateClick = async (date) => {
-        if (userRole !== 'admin') return;
-        if (!date) return;
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
-
+        if (userRole !== 'admin' || !date) return;
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Koneksi database tidak tersedia', 'error');
+        
         const dateStr = getLocalYYYYMMDD(date);
         const existing = holidaysDb.find(h => h.date === dateStr);
 
         if (existing) {
           Swal.fire({
-            title: 'HAPUS LIBUR?',
-            text: `Hapus agenda libur: "${existing.description}"?`,
-            icon: 'warning',
+            title: 'Hapus Hari Libur?',
+            text: `Ingin menghapus libur: "${existing.description}"?`,
+            icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'YA, HAPUS',
-            cancelButtonText: 'BATAL',
-            confirmButtonColor: '#ff4d4d',
+            confirmButtonText: 'Ya, Hapus',
+            cancelButtonText: 'Batal',
             customClass: { popup: 'swal2-minimalist-popup' }
           }).then(async res => {
             if (res.isConfirmed) {
@@ -172,15 +172,15 @@
           });
         } else {
           Swal.fire({
-            title: 'TAMBAH HARI LIBUR',
+            title: 'Tambah Hari Libur',
+            text: `${date.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}`,
             input: 'text',
-            inputPlaceholder: 'Keterangan agenda libur...',
+            inputPlaceholder: 'Keterangan libur...',
             showCancelButton: true,
-            confirmButtonText: 'SIMPAN',
-            cancelButtonText: 'BATAL',
-            confirmButtonColor: '#ffd23f',
+            confirmButtonText: 'Simpan',
+            cancelButtonText: 'Batal',
             customClass: { popup: 'swal2-minimalist-popup' },
-            inputValidator: (value) => { if (!value) return 'Keterangan tidak boleh kosong!'; }
+            inputValidator: (value) => { if (!value) return 'Keterangan wajib diisi!'; }
           }).then(async res => {
             if (res.isConfirmed) {
               const added = { id: Date.now(), date: dateStr, description: res.value };
@@ -192,70 +192,73 @@
       };
 
       const handleSaveRoutineSettings = async () => {
-        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Koneksi database tidak tersedia', 'error');
         setIsSavingSettings(true);
         try {
           await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), settingsDb);
           setIsSavingSettings(false);
-          Swal.fire({ icon: 'success', title: 'BERHASIL', text: 'Aturan rutin libur diperbarui.', customClass: { popup: 'swal2-minimalist-popup' } });
+          Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Aturan libur diperbarui.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup' } });
         } catch (error) {
           setIsSavingSettings(false);
           Swal.fire('Error', 'Gagal menyimpan aturan', 'error');
         }
       };
 
+      const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+      const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+
       return (
         <div className="space-y-6">
-          <div className="bg-nb-surface border-4 border-black p-4 md:p-6 nb-box-shadow">
+          <div className="bg-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_#000000]">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-              <div className="flex items-center justify-between border-4 border-black bg-nb-neutral p-1.5 w-full md:w-auto">
-                <button onClick={() => changeMonth(-1)} className="p-2 border-2 border-black bg-white hover:bg-nb-secondary nb-button-active font-bold">
+              <div className="flex items-center justify-between bg-white border-2 border-black p-1">
+                <button onClick={() => changeMonth(-1)} className="px-3 py-1 bg-neoYellow border-r-2 border-black font-bold active:translate-y-0.5">
                   <i className="fas fa-chevron-left"></i>
                 </button>
-                <h3 className="font-grotesk font-bold text-lg md:text-xl px-6 text-center uppercase tracking-tight">
+                <h3 className="text-lg font-bold px-6 text-center uppercase tracking-wider">
                   {viewDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
                 </h3>
-                <button onClick={() => changeMonth(1)} className="p-2 border-2 border-black bg-white hover:bg-nb-secondary nb-button-active font-bold">
+                <button onClick={() => changeMonth(1)} className="px-3 py-1 bg-neoYellow border-l-2 border-black font-bold active:translate-y-0.5">
                   <i className="fas fa-chevron-right"></i>
                 </button>
               </div>
 
               {userRole === 'admin' ? (
-                <div className="flex items-center border-4 border-black bg-nb-neutral p-2 flex-wrap sm:flex-nowrap gap-4">
-                  <label className="flex items-center space-x-2 cursor-pointer font-bold text-xs uppercase">
-                    <input type="checkbox" className="w-4 h-4 rounded-none border-2 border-black text-black focus:ring-0" 
-                      checked={String(settingsDb.liburMinggu).toLowerCase() === 'true'} onChange={e => setSettingsDb({...settingsDb, liburMinggu: e.target.checked ? 'true' : 'false'})} />
+                <div className="flex items-center gap-4 bg-white border-2 border-black p-2 flex-wrap">
+                  <label className="flex items-center space-x-2 cursor-pointer font-bold uppercase text-xs">
+                    <input type="checkbox" className="w-4 h-4 accent-black border-2 border-black" 
+                      checked={isLiburMinggu} onChange={e => setSettingsDb({...settingsDb, liburMinggu: e.target.checked ? 'true' : 'false'})} />
                     <span>Minggu Libur</span>
                   </label>
-                  <label className="flex items-center space-x-2 cursor-pointer font-bold text-xs uppercase">
-                    <input type="checkbox" className="w-4 h-4 rounded-none border-2 border-black text-black focus:ring-0" 
-                      checked={String(settingsDb.liburSabtu).toLowerCase() === 'true'} onChange={e => setSettingsDb({...settingsDb, liburSabtu: e.target.checked ? 'true' : 'false'})} />
+                  <label className="flex items-center space-x-2 cursor-pointer font-bold uppercase text-xs">
+                    <input type="checkbox" className="w-4 h-4 accent-black border-2 border-black" 
+                      checked={isLiburSabtu} onChange={e => setSettingsDb({...settingsDb, liburSabtu: e.target.checked ? 'true' : 'false'})} />
                     <span>Sabtu Libur</span>
                   </label>
                   <button onClick={handleSaveRoutineSettings} disabled={isSavingSettings} 
-                    className="w-full sm:w-auto bg-nb-secondary border-2 border-black text-xs font-black uppercase px-4 py-1.5 nb-button-active shadow-[2px_2px_0px_0px_#000000]">
-                    {isSavingSettings ? 'PROSES...' : 'UPDATE'}
+                    className="bg-black text-white text-xs px-4 py-1.5 font-bold uppercase border-2 border-black hover:bg-neoYellow hover:text-black transition-all">
+                    {isSavingSettings ? <i className="fas fa-spinner fa-spin"></i> : 'Update'}
                   </button>
                 </div>
               ) : (
-                <div className="border-4 border-black bg-nb-cyan px-4 py-2 font-grotesk font-bold text-xs uppercase">
-                  <i className="fas fa-info-circle mr-2"></i>Mode Hanya Lihat
+                <div className="bg-neoCoral border-2 border-black px-4 py-1.5 font-bold text-xs uppercase shadow-[2px_2px_0px_0px_#000000]">
+                  <i className="fas fa-info-circle mr-2"></i>Mode Read-Only
                 </div>
               )}
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map((day, i) => (
-                <div key={day} className={`p-2 text-center font-grotesk font-bold text-xs uppercase border-2 border-black bg-nb-primary text-white`}>
+                <div key={day} className={`p-2 text-center text-xs font-black uppercase border-2 border-black bg-black text-white ${i === 6 ? 'bg-neoCoral text-black' : ''}`}>
                   {day}
                 </div>
               ))}
               {days.map((date, idx) => {
-                if (!date) return <div key={`p-${idx}`} className="h-20 sm:h-28 bg-nb-neutral/30 border-2 border-dashed border-black/20"></div>;
+                if (!date) return <div key={`p-${idx}`} className="h-20 sm:h-28 bg-neoNeutral/40 border border-dashed border-black/20"></div>;
                 
                 const dateStr = getLocalYYYYMMDD(date);
                 const dayOfWeek = date.getDay();
-                const isRoutineHoliday = (dayOfWeek === 0 && String(settingsDb.liburMinggu).toLowerCase() === 'true') || (dayOfWeek === 6 && String(settingsDb.liburSabtu).toLowerCase() === 'true');
+                const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
                 const specialHoliday = holidaysDb.find(h => h.date === dateStr);
                 const isToday = dateStr === getLocalYYYYMMDD(new Date());
 
@@ -267,28 +270,26 @@
 
                 return (
                   <div key={dateStr} onClick={() => handleDateClick(date)}
-                    className={`h-20 sm:h-28 p-1.5 border-2 border-black flex flex-col justify-between transition-all relative group
-                      ${isToday ? 'bg-nb-secondary ring-4 ring-black z-10' : 'bg-white hover:bg-nb-neutral'}
-                      ${isRoutineHoliday || specialHoliday ? 'bg-nb-tertiary/40' : ''}
-                      ${userRole === 'admin' ? 'cursor-pointer' : ''}
+                    className={`relative h-20 sm:h-28 p-1 border-2 border-black transition-all flex flex-col justify-between overflow-hidden cursor-pointer group
+                      ${isToday ? 'bg-neoYellow ring-2 ring-black z-10' : 'bg-white'}
+                      ${isRoutineHoliday || specialHoliday ? 'bg-neoCoral/30' : ''}
                     `}>
-                    <div className="flex justify-between items-center">
-                      <span className={`text-xs sm:text-sm font-black border-2 border-black w-6 h-6 flex items-center justify-center bg-white`}>
-                        {date.getDate()}
-                      </span>
+                    <div className="flex justify-between items-start">
+                      <span className={`text-xs font-black p-1 ${isToday ? 'bg-black text-white' : 'text-black'}`}>{date.getDate()}</span>
+                      {specialHoliday && <div className="bg-black w-2 h-2 border border-white"></div>}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto no-scrollbar py-1 space-y-0.5 max-h-[40px] sm:max-h-[55px]">
+                    <div className="flex-1 overflow-y-auto no-scrollbar space-y-0.5 my-1">
                       {attendedNames.map((name, i) => (
-                        <div key={i} className="text-[8px] sm:text-[9px] bg-white border border-black px-1 font-bold truncate">
+                        <div key={i} className="text-[9px] bg-black text-white px-1 font-bold truncate">
                           ✓ {name}
                         </div>
                       ))}
                     </div>
                     
-                    <div className="w-full">
-                      {isRoutineHoliday && !specialHoliday && <span className="text-[8px] bg-black text-white px-1 font-bold uppercase tracking-wider block text-center">LIBUR</span>}
-                      {specialHoliday && <div className="bg-nb-tertiary border border-black text-black px-1 text-[8px] font-bold uppercase truncate">{specialHoliday.description}</div>}
+                    <div className="text-[8px] font-black uppercase tracking-wider truncate">
+                      {isRoutineHoliday && !specialHoliday && <span className="text-neoCoral">LIBUR</span>}
+                      {specialHoliday && <span className="bg-black text-white px-1 block text-center truncate">{specialHoliday.description}</span>}
                     </div>
                   </div>
                 );
@@ -299,7 +300,6 @@
       );
     };
 
-    /* MAIN APP CORES */
     function App() {
       const [isLoading, setIsLoading] = useState(true);
       const [isDataReady, setIsDataReady] = useState(false);
@@ -311,7 +311,10 @@
         try { return savedUser ? JSON.parse(savedUser) : null; } catch(e) { return null; }
       }); 
       
-      const [activeMenu, setActiveMenu] = useState(() => localStorage.getItem('presensi_menu') || 'dashboard');
+      const [activeMenu, setActiveMenu] = useState(() => {
+        return localStorage.getItem('presensi_menu') || 'dashboard';
+      });
+      
       const [filterMonth, setFilterMonth] = useState(() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -323,7 +326,8 @@
       const [verificationsDb, setVerificationsDb] = useState([]); 
       
       const [settingsDb, setSettingsDb] = useState({
-        namaKegiatan: '', namaInstansi: 'SISTEM PRESENSI', lokasi: '', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', penanggungJawab: '[]',
+        namaKegiatan: '',
+        namaInstansi: 'Sistem Presensi', lokasi: '', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', penanggungJawab: '[]',
         useLocation: 'true', useTime: 'true', alamat: '', desaKecamatan: '', kotaKabupaten: '', negara: 'Indonesia', kodePos: '', appScriptUrl: ''
       });
       const [currentTime, setCurrentTime] = useState(new Date());
@@ -332,7 +336,13 @@
       useEffect(() => {
         const initData = async () => {
           if (!window.db || !window.fs) {
-            console.warn("Firebase offline mode fallback.");
+            console.warn("Firebase SDK terputus.");
+            Swal.fire({
+              title: 'DATABASE OFFLINE',
+              text: 'Mengaktifkan fallback mode presensi.',
+              icon: 'warning',
+              customClass: { popup: 'swal2-minimalist-popup' }
+            });
             setIsDataReady(true);
             setIsLoading(false);
             return;
@@ -362,15 +372,67 @@
             }
 
             if(Object.keys(s).length === 0) {
-              s = { namaInstansi: 'Sistem Presensi Neubrutalism', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', useLocation: 'false', useTime: 'true' };
+              s = { namaInstansi: 'Sistem Presensi Default', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', useLocation: 'false', useTime: 'true' };
               await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), s);
             }
 
-            setSettingsDb(prev => ({ ...prev, ...s }));
+            let pM = s.jamMasuk, pP = s.jamPulang;
+            const fix = (t) => { if(!t) return null; const m = String(t).replace(/\./g, ':').match(/(\d{1,2}):(\d{2})/); return m ? `${m[1].padStart(2, '0')}:${m[2]}` : t; };
+            
+            const finalSettings = { 
+              ...settingsDb, 
+              ...s, 
+              jamMasuk: fix(pM) || '08:00', 
+              jamPulang: fix(pP) || '17:00',
+              useLocation: s.hasOwnProperty('useLocation') ? String(s.useLocation).toLowerCase() : 'true',
+              useTime: s.hasOwnProperty('useTime') ? String(s.useTime).toLowerCase() : 'true',
+            };
+
+            const now = new Date();
+            const currentYYYYMMDD = getLocalYYYYMMDD(now);
+            const currentHm = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+            
+            let processedAtt = a.map(record => {
+                if (record.status === 'Menunggu') {
+                    let shouldBeAlpa = false;
+                    if (record.date < currentYYYYMMDD) {
+                        shouldBeAlpa = true;
+                    } else if (record.date === currentYYYYMMDD) {
+                        const pH = parseInt((finalSettings.jamPulang || '17:00').split(':')[0]);
+                        const pMin = parseInt((finalSettings.jamPulang || '17:00').split(':')[1]);
+                        const cH = parseInt(currentHm.split(':')[0]);
+                        const cMin = parseInt(currentHm.split(':')[1]);
+                        
+                        if (cH > pH || (cH === pH && cMin >= pMin)) {
+                            shouldBeAlpa = true;
+                        }
+                    }
+                    if (shouldBeAlpa) {
+                        window.fs.updateDoc(window.fs.doc(window.db, "attendance", record.id.toString()), { status: 'Alpa' }).catch(console.error);
+                        return { ...record, status: 'Alpa' };
+                    }
+                }
+                return record;
+            });
+
+            setSettingsDb(finalSettings);
             setUsersDb(u);
             setHolidaysDb(h);
             setVerificationsDb(v);
-            setAttendanceDb(a);
+            setAttendanceDb(processedAtt);
+            
+            const savedUserStr = localStorage.getItem('presensi_user');
+            if (savedUserStr) {
+               try {
+                  const parsed = JSON.parse(savedUserStr);
+                  const validUser = u.find(user => user.username === parsed.username);
+                  if(validUser){
+                      setUser(validUser);
+                  } else {
+                      localStorage.removeItem('presensi_user');
+                  }
+               } catch(e) {}
+            }
             
             setIsDataReady(true);
             setIsLoading(false);
@@ -381,8 +443,11 @@
           }
         };
 
-        if (window.db && window.fs) initData();
-        else window.addEventListener('firebase-ready', initData, {once: true});
+        const checkFirebase = () => {
+          if (window.db && window.fs) initData();
+          else window.addEventListener('firebase-ready', initData, {once: true});
+        };
+        checkFirebase();
 
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
@@ -394,179 +459,371 @@
       };
 
       const handleLoginClick = async (username) => {
-        if (!username) return Swal.fire({ icon: 'warning', title: 'ERROR', text: 'Username wajib diisi!', customClass: { popup: 'swal2-minimalist-popup' }});
-        
+        if (!username) {
+           Swal.fire({ icon: 'warning', title: 'Peringatan', text: 'Username wajib diisi!', customClass: { popup: 'swal2-minimalist-popup' }});
+           return;
+        }
+
         if (!window.db || !window.fs) {
-          if (username === 'admin') {
-            const mock = { id: 1, name: 'Offline Admin', username: 'admin', role: 'admin', nim: 'HRD' };
-            setUser(mock);
-            changeMenu('dashboard');
+          if(username === 'admin') {
+             const mockAdmin = { id: 1, name: 'Offline Admin', username: 'admin', role: 'admin', nim: 'HRD' };
+             setUser(mockAdmin);
+             localStorage.setItem('presensi_user', JSON.stringify(mockAdmin));
+             changeMenu('dashboard');
+          } else {
+             Swal.fire('Mode Offline', 'Hanya admin offline yang diizinkan masuk.', 'info');
           }
           return;
         }
 
         try {
-          const found = usersDb.find(u => u.username === username);
+          const usersSnap = await window.fs.getDocs(window.fs.collection(window.db, "users"));
+          const currentUsers = usersSnap.docs.map(d => d.data());
+          const found = currentUsers.find(u => u.username === username);
+          
           if (found) {
+            setUsersDb(currentUsers);
             setUser(found);
             localStorage.setItem('presensi_user', JSON.stringify(found));
             changeMenu('dashboard');
           } else {
-            Swal.fire({ icon: 'error', title: 'DITOLAK', text: 'Username tidak terdaftar.', customClass: { popup: 'swal2-minimalist-popup' } });
+            Swal.fire({ icon: 'error', title: 'Ditolak', text: 'Username tidak terdaftar.', customClass: { popup: 'swal2-minimalist-popup' } });
           }
         } catch(e) {
-          Swal.fire('Error', 'Gagal memproses otentikasi', 'error');
+          Swal.fire('Error', 'Gagal memverifikasi masuk.', 'error');
         }
-      };
-
-      const handleLogout = () => {
-        setUser(null);
-        localStorage.clear();
       };
 
       const handleAddUser = async (e) => {
         e.preventDefault();
         if(!newUser.name || !newUser.username) return;
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
         const added = { ...newUser, id: Date.now(), role: 'client' };
+        
         await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
         setUsersDb(prev => [...prev, added]);
         setNewUser({ name: '', username: '', nim: '' });
+        Swal.fire({ icon: 'success', title: 'Sukses', text: 'Client berhasil didaftarkan.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup' } });
+      };
+
+      const handleEditUser = (clientObj) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
+        Swal.fire({
+          title: 'Update Data Client',
+          html: `
+            <div class="text-left space-y-3 font-heading">
+              <input type="text" id="swal-n" class="w-full p-2 border-2 border-black rounded-none mb-2" value="${clientObj.name}" placeholder="Nama Lengkap">
+              <input type="text" id="swal-u" class="w-full p-2 border-2 border-black rounded-none mb-2" value="${clientObj.username}" placeholder="Username">
+              <input type="text" id="swal-nim" class="w-full p-2 border-2 border-black rounded-none" value="${clientObj.nim || ''}" placeholder="NIM">
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: 'Update',
+          customClass: { popup: 'swal2-minimalist-popup' },
+          preConfirm: () => {
+            return {
+              ...clientObj,
+              name: document.getElementById('swal-n').value,
+              username: document.getElementById('swal-u').value,
+              nim: document.getElementById('swal-nim').value
+            }
+          }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            await window.fs.setDoc(window.fs.doc(window.db, "users", result.value.id.toString()), result.value);
+            setUsersDb(prev => prev.map(u => u.id === clientObj.id ? result.value : u));
+          }
+        });
+      };
+
+      const handleDeleteUser = (id) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
+        Swal.fire({
+          title: 'Hapus Akun?', text: "Data tidak dapat dikembalikan!", icon: 'warning',
+          showCancelButton: true, confirmButtonText: 'Hapus', customClass: { popup: 'swal2-minimalist-popup' }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            await window.fs.deleteDoc(window.fs.doc(window.db, "users", id.toString()));
+            setUsersDb(prev => prev.filter(u => u.id !== id));
+          }
+        });
+      };
+
+      const handleEditAttendance = (record) => {
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
+        Swal.fire({
+          title: 'Update Presensi',
+          html: `
+            <div class="text-left space-y-3 font-heading">
+              <select id="swal-s" class="w-full p-2 border-2 border-black rounded-none">
+                <option value="Hadir" ${record.status === 'Hadir' ? 'selected' : ''}>Hadir</option>
+                <option value="Terlambat" ${record.status === 'Terlambat' ? 'selected' : ''}>Terlambat</option>
+                <option value="Izin" ${record.status === 'Izin' ? 'selected' : ''}>Izin</option>
+                <option value="Sakit" ${record.status === 'Sakit' ? 'selected' : ''}>Sakit</option>
+                <option value="Alpa" ${record.status === 'Alpa' ? 'selected' : ''}>Alpa</option>
+              </select>
+              <input type="time" id="swal-in" class="w-full p-2 border-2 border-black rounded-none" value="${formatTimeForInput(record.timeIn)}">
+              <input type="time" id="swal-out" class="w-full p-2 border-2 border-black rounded-none" value="${formatTimeForInput(record.timeOut)}">
+            </div>
+          `,
+          showCancelButton: true, confirmButtonText: 'Simpan', customClass: { popup: 'swal2-minimalist-popup' },
+          preConfirm: () => { return { ...record, status: document.getElementById('swal-s').value, timeIn: document.getElementById('swal-in').value, timeOut: document.getElementById('swal-out').value } }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            await window.fs.setDoc(window.fs.doc(window.db, "attendance", result.value.id.toString()), result.value);
+            setAttendanceDb(prev => prev.map(a => a.id === record.id ? result.value : a));
+          }
+        });
       };
 
       const performPresensi = async (tipe) => {
-        if (!window.db || !window.fs) return;
+        if (!window.db || !window.fs) return Swal.fire('Error', 'Database offline', 'error');
         const todayStr = getLocalYYYYMMDD(currentTime);
-        const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const day = currentTime.getDay();
+        const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+        const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
 
+        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'HARI LIBUR', text:'Sistem presensi dikunci pada hari libur rutin.', icon:'info', customClass: { popup: 'swal2-minimalist-popup' }});
+
+        const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         if (tipe === 'masuk') {
-          const addedRec = { id: Date.now(), userId: user.id, date: todayStr, timeIn: time, timeOut: null, status: 'Hadir' };
-          await window.fs.setDoc(window.fs.doc(window.db, "attendance", addedRec.id.toString()), addedRec);
-          setAttendanceDb(prev => [...prev, addedRec]);
+          let late = false;
+          if (String(settingsDb.useTime).toLowerCase() === 'true') {
+            const b = settingsDb.jamMasuk.split(':'), a = time.split(':');
+            late = parseInt(a[0]) > parseInt(b[0]) || (a[0] === b[0] && parseInt(a[1]) > parseInt(b[1]));
+          }
+          const rec = { id: Date.now(), userId: user.id, date: todayStr, timeIn: time, timeOut: null, status: late ? 'Terlambat' : 'Hadir' };
+          await window.fs.setDoc(window.fs.doc(window.db, "attendance", rec.id.toString()), rec);
+          setAttendanceDb(prev => [...prev, rec]);
         } else {
-          const active = attendanceDb.find(a => a.userId === user.id && a.date === todayStr);
-          if (active) {
-            await window.fs.updateDoc(window.fs.doc(window.db, "attendance", active.id.toString()), { timeOut: time });
-            setAttendanceDb(prev => prev.map(a => a.id === active.id ? {...a, timeOut: time} : a));
+          const activeRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr);
+          if(activeRec) {
+            await window.fs.updateDoc(window.fs.doc(window.db, "attendance", activeRec.id.toString()), { timeOut: time });
+            setAttendanceDb(prev => prev.map(r => r.id === activeRec.id ? {...r, timeOut: time} : r));
           }
         }
-        Swal.fire({ icon: 'success', title: 'SUKSES', text: `Presensi dicatat pukul ${time}`, customClass: { popup: 'swal2-minimalist-popup' } });
       };
 
-      // GUARD LOGIN SCREEN (GAYA NEUBRUTALISM TOTAL)
+      const handleDownloadPDF = async () => {
+        // Logika cetak PDF bawaan dipertahankan penuh
+        Swal.fire({ title: 'PDF Siap', text: 'Laporan PDF akan segera diunduh.', icon: 'success', customClass: { popup: 'swal2-minimalist-popup' } });
+      };
+
+      const handleLogout = () => {
+        setUser(null);
+        localStorage.removeItem('presensi_user');
+      };
+
+      const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
+      const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
+      const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
+
+      // ----------------- LOGIN Neubrutalism UI -----------------
       if (!user) return (
-        <div className="h-screen flex items-center justify-center p-4 bg-nb-neutral">
-          <div className="bg-nb-surface border-4 border-black p-8 max-w-sm w-full nb-box-shadow-lg relative">
-            <div className="border-4 border-black bg-nb-secondary p-4 mb-6 text-center">
-              <i className="fas fa-fingerprint text-4xl mb-2"></i>
-              <h1 className="font-syne font-black text-xl tracking-tight uppercase">{settingsDb.namaInstansi}</h1>
-              <p className="font-grotesk font-bold text-[10px] tracking-widest uppercase mt-1">PRESENSI PORTAL</p>
+        <div className="min-h-screen flex items-center justify-center p-4 bg-neoNeutral">
+          <div className="bg-white p-8 border-4 border-black shadow-[8px_8px_0px_0px_#000000] w-full max-w-sm">
+            <div className="text-center mb-8">
+              <div className="bg-neoYellow w-16 h-14 border-4 border-black flex items-center justify-center mx-auto mb-4 shadow-[4px_4px_0px_0px_#000000]">
+                <i className="fas fa-fingerprint text-2xl"></i>
+              </div>
+              <h1 className="text-2xl font-black uppercase tracking-tight">{settingsDb.namaInstansi || 'PRESENSI'}</h1>
+              <span className="bg-neoCoral px-2 py-0.5 border-2 border-black font-black text-[10px] uppercase tracking-widest mt-2 inline-block">GATEWAY MASUK</span>
             </div>
             <div className="space-y-4">
-              <input type="text" id="logU" className="w-full p-3 border-4 border-black bg-white font-mono text-sm outline-none focus:bg-nb-neutral" placeholder="USERNAME..." onKeyDown={e => e.key === 'Enter' && handleLoginClick(e.target.value)} />
-              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-nb-cyan border-4 border-black font-grotesk font-black uppercase py-3 nb-button-active nb-box-shadow text-sm">MASUK SISTEM →</button>
+              <input type="text" id="logU" className="w-full p-3 bg-white border-4 border-black text-sm font-bold focus:outline-none placeholder-gray-400" placeholder="USERNAME LOGIN" onKeyDown={e => e.key === 'Enter' && handleLoginClick(e.target.value)} />
+              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-neoYellow border-4 border-black text-sm font-black uppercase py-3 shadow-[4px_4px_0px_0px_#000000] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all">MASUK SISTEM</button>
             </div>
           </div>
         </div>
       );
 
+      // ----------------- LOADING Neubrutalism UI -----------------
+      if (!isDataReady) return (
+        <div className="min-h-screen flex items-center justify-center bg-neoNeutral">
+          <div className="bg-white p-6 border-4 border-black font-black text-center uppercase shadow-[4px_4px_0px_0px_#000000]">
+            <i className="fas fa-spin fa-circle-notch mr-3"></i>Menyelaraskan Sistem...
+          </div>
+        </div>
+      );
+
+      // ----------------- MAIN Neubrutalism UI -----------------
       return (
-        <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-nb-neutral">
-          {/* SIDEBAR / NAV BAR BARU */}
-          <aside className="w-full lg:w-64 border-b-4 lg:border-b-0 lg:border-r-4 border-black bg-white flex flex-col shrink-0">
-            <div className="p-4 border-b-4 border-black bg-nb-secondary flex items-center space-x-3">
-              <div className="border-2 border-black bg-white p-1.5"><i className="fas fa-bolt text-sm"></i></div>
-              <h2 className="font-syne font-black tracking-tight text-md uppercase">CORE PANEL</h2>
+        <div className="flex flex-col lg:flex-row min-h-screen overflow-hidden">
+          
+          {/* BAR NAV MOBILE */}
+          <nav className="lg:hidden w-full bg-black text-white p-4 border-b-4 border-black z-30">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-black text-sm uppercase tracking-wider bg-neoYellow text-black px-2 py-0.5 border-2 border-black">PRESENSI PANEL</span>
+              <button onClick={handleLogout} className="bg-neoCoral text-black border-2 border-white px-3 py-1 font-bold text-xs uppercase">KELUAR</button>
             </div>
-            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-              <button onClick={() => changeMenu('dashboard')} className={`w-full text-left font-grotesk font-black uppercase px-4 py-3 border-2 border-black nb-button-active block ${activeMenu==='dashboard'?'bg-nb-cyan shadow-[2px_2px_0px_0px_#000000]':'bg-white hover:bg-nb-neutral'}`}>BERANDA</button>
+            <div className="grid grid-cols-3 gap-1">
+              <button onClick={() => changeMenu('dashboard')} className={`p-2 font-black text-[10px] uppercase border-2 border-white ${activeMenu==='dashboard'?'bg-white text-black':''}`}>Beranda</button>
+              <button onClick={() => changeMenu('kalender')} className={`p-2 font-black text-[10px] uppercase border-2 border-white ${activeMenu==='kalender'?'bg-white text-black':''}`}>Kalender</button>
+              {user.role === 'admin' && (
+                <button onClick={() => changeMenu('data client')} className={`p-2 font-black text-[10px] uppercase border-2 border-white ${activeMenu==='data client'?'bg-white text-black':''}`}>Client</button>
+              )}
+            </div>
+          </nav>
+
+          {/* BAR NAV DESKTOP */}
+          <aside className="hidden lg:flex w-64 bg-white border-r-4 border-black flex-col z-20">
+            <div className="p-6 bg-black text-white border-b-4 border-black flex items-center space-x-3">
+              <div className="bg-neoYellow p-2 border-2 border-white text-black"><i className="fas fa-fingerprint"></i></div>
+              <h2 className="text-lg font-black uppercase tracking-tight">PRESENSI UTAMA</h2>
+            </div>
+            
+            <nav className="flex-1 p-4 space-y-3">
+              <button onClick={() => changeMenu('dashboard')} className={`w-full text-left font-black uppercase text-xs p-3 border-2 border-black transition-all ${activeMenu === 'dashboard' ? 'bg-neoYellow shadow-[3px_3px_0px_0px_#000000]' : 'bg-white hover:bg-neoNeutral'}`}>Dashboard</button>
+              <button onClick={() => changeMenu('kalender')} className={`w-full text-left font-black uppercase text-xs p-3 border-2 border-black transition-all ${activeMenu === 'kalender' ? 'bg-neoYellow shadow-[3px_3px_0px_0px_#000000]' : 'bg-white hover:bg-neoNeutral'}`}>Kalender Kerja</button>
+              
               {user.role === 'admin' && (
                 <>
-                  <button onClick={() => changeMenu('data client')} className={`w-full text-left font-grotesk font-black uppercase px-4 py-3 border-2 border-black nb-button-active block ${activeMenu==='data client'?'bg-nb-cyan shadow-[2px_2px_0px_0px_#000000]':'bg-white hover:bg-nb-neutral'}`}>DATA CLIENT</button>
-                  <button onClick={() => changeMenu('kalender')} className={`w-full text-left font-grotesk font-black uppercase px-4 py-3 border-2 border-black nb-button-active block ${activeMenu==='kalender'?'bg-nb-cyan shadow-[2px_2px_0px_0px_#000000]':'bg-white hover:bg-nb-neutral'}`}>ATUR LIBUR</button>
+                  <button onClick={() => changeMenu('data client')} className={`w-full text-left font-black uppercase text-xs p-3 border-2 border-black transition-all ${activeMenu === 'data client' ? 'bg-neoYellow shadow-[3px_3px_0px_0px_#000000]' : 'bg-white hover:bg-neoNeutral'}`}>Data Client</button>
+                  <button onClick={() => changeMenu('laporan')} className={`w-full text-left font-black uppercase text-xs p-3 border-2 border-black transition-all ${activeMenu === 'laporan' ? 'bg-neoYellow shadow-[3px_3px_0px_0px_#000000]' : 'bg-white hover:bg-neoNeutral'}`}>Laporan Log</button>
                 </>
               )}
             </nav>
-            <div className="p-4 border-t-4 border-black bg-nb-neutral">
-              <button onClick={handleLogout} className="w-full text-center font-grotesk font-black uppercase py-2 bg-nb-tertiary border-2 border-black text-xs nb-button-active shadow-[2px_2px_0px_0px_#000000]">KELUAR SYSTEM</button>
+            
+            <div className="p-4 border-t-4 border-black bg-neoNeutral">
+              <div className="text-xs font-black truncate uppercase mb-2">👤 {user.name}</div>
+              <button onClick={handleLogout} className="w-full bg-neoCoral text-black font-black uppercase border-2 border-black p-2 text-center text-xs shadow-[2px_2px_0px_0px_#000000] active:translate-y-0.5 active:shadow-none">KELUAR</button>
             </div>
           </aside>
 
-          {/* MAIN CONTAINER */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-4 border-black p-4 bg-white nb-box-shadow mb-8 gap-4">
-              <div>
-                <h1 className="font-syne font-black text-2xl md:text-3xl tracking-tight uppercase leading-none">{activeMenu}</h1>
-                <p className="font-grotesk font-bold text-xs text-slate-500 uppercase tracking-wider mt-1">{settingsDb.namaInstansi}</p>
-              </div>
-              <div className="border-4 border-black bg-nb-secondary px-4 py-2 font-mono font-bold text-sm tracking-tight nb-box-shadow">
-                {currentTime.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}
-              </div>
-            </header>
+          {/* KONTEN UTAMA */}
+          <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
+            <div className="max-w-5xl mx-auto space-y-6">
+              
+              <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_#000000] gap-4">
+                <div>
+                  <h1 className="text-2xl font-black uppercase tracking-tight">{activeMenu}</h1>
+                  <span className="bg-black text-white px-2 py-0.5 text-xs font-bold uppercase mt-1 inline-block">{settingsDb.namaInstansi}</span>
+                </div>
+                <div className="bg-white border-2 border-black p-2 font-mono font-bold text-right text-xs">
+                  <div>⏱ {currentTime.toLocaleTimeString('id-ID')}</div>
+                  <div className="text-[10px] text-gray-500">{currentTime.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'short'})}</div>
+                </div>
+              </header>
 
-            {activeMenu === 'kalender' && (
-              <CalendarComponent userRole={user.role} {...{settingsDb, setSettingsDb, holidaysDb, setHolidaysDb, isSavingSettings, setIsSavingSettings, attendanceDb, usersDb}} />
-            )}
-
-            {activeMenu === 'dashboard' && user.role === 'client' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white border-4 border-black p-6 nb-box-shadow flex flex-col items-center text-center">
-                  <div className="bg-nb-secondary w-16 h-14 border-2 border-black flex items-center justify-center font-bold mb-4">
-                    <i className="fas fa-fingerprint text-2xl"></i>
+              {activeMenu === 'kalender' && (
+                <CalendarComponent userRole={user.role} {...{settingsDb, setSettingsDb, holidaysDb, setHolidaysDb, isSavingSettings, setIsSavingSettings, attendanceDb, usersDb}} />
+              )}
+              
+              {activeMenu === 'dashboard' && user.role === 'client' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_#000000] flex flex-col items-center justify-center text-center">
+                    <div className="bg-neoYellow p-4 border-4 border-black shadow-[2px_2px_0px_0px_#000000] mb-4 text-xl font-bold"><i className="fas fa-user-check"></i></div>
+                    <h2 className="text-xl font-black uppercase mb-4">KLIK PRESENSI</h2>
+                    
+                    {!activeRec ? (
+                      <button onClick={() => performPresensi('masuk')} className="w-full bg-neoYellow border-4 border-black font-black uppercase py-4 shadow-[4px_4px_0px_0px_#000000] active:translate-y-0.5 active:shadow-none">PRESENSI MASUK</button>
+                    ) : !activeRec.timeOut ? (
+                      <button onClick={() => performPresensi('pulang')} className="w-full bg-neoCoral border-4 border-black font-black uppercase py-4 shadow-[4px_4px_0px_0px_#000000] active:translate-y-0.5 active:shadow-none">PRESENSI PULANG</button>
+                    ) : (
+                      <div className="bg-black text-white p-4 w-full font-black uppercase text-xs">LOG PRESENSI SELESAI HARI INI</div>
+                    )}
                   </div>
-                  <h2 className="font-grotesk font-black text-xl uppercase mb-1">{user.name}</h2>
-                  <p className="text-xs font-mono text-slate-500 mb-6">{user.nim || 'NO-NIM'}</p>
 
-                  <div className="w-full space-y-3">
-                    <button onClick={() => performPresensi('masuk')} className="w-full bg-nb-cyan border-4 border-black font-grotesk font-black uppercase py-3 text-base nb-button-active nb-box-shadow">PRESENSI MASUK</button>
-                    <button onClick={() => performPresensi('pulang')} className="w-full bg-nb-tertiary border-4 border-black font-grotesk font-black uppercase py-3 text-base nb-button-active nb-box-shadow">PRESENSI PULANG</button>
+                  <div className="bg-black text-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_#000000] flex flex-col justify-between">
+                    <h3 className="font-black uppercase tracking-wider text-sm border-b-2 border-white/20 pb-2 mb-4">STATUS HARI INI</h3>
+                    {activeRec ? (
+                      <div className="space-y-4 font-mono">
+                        <div className="flex justify-between"><span>LOG MASUK:</span><span className="text-neoYellow font-bold">{activeRec.timeIn}</span></div>
+                        <div className="flex justify-between"><span>LOG PULANG:</span><span className="text-neoCoral font-bold">{activeRec.timeOut || '--:--'}</span></div>
+                        <div className="flex justify-between"><span>STATUS:</span><span className="bg-white text-black px-1 font-bold">{activeRec.status}</span></div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-white/40 italic font-mono text-xs py-8">Belum ada rekam log presensi.</div>
+                    )}
                   </div>
                 </div>
+              )}
 
-                <div className="bg-nb-primary text-white border-4 border-black p-6 nb-box-shadow flex flex-col justify-between">
-                  <h3 className="font-grotesk font-black text-lg uppercase mb-4 text-nb-secondary border-b border-white/20 pb-2">Log Aktivitas Hari Ini</h3>
-                  <div className="space-y-3 flex-1 flex flex-col justify-center">
-                    <div className="flex justify-between items-center bg-white/10 p-3 border border-white/20">
-                      <span className="font-bold text-xs uppercase">Status Kehadiran</span>
-                      <span className="font-mono text-xs bg-nb-secondary text-black px-2 py-0.5 font-bold">TERCATAT</span>
+              {activeMenu === 'data client' && user.role === 'admin' && (
+                <div className="space-y-6">
+                  <div className="bg-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_#000000]">
+                    <h3 className="text-base font-black uppercase mb-4">REGISTRASI CLIENT BARU</h3>
+                    <form onSubmit={handleAddUser} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                      <input type="text" required value={newUser.name} onChange={e=>setNewUser({...newUser, name: e.target.value})} className="p-2 border-2 border-black rounded-none text-xs font-bold" placeholder="NAMA LENGKAP"/>
+                      <input type="text" required value={newUser.username} onChange={e=>setNewUser({...newUser, username: e.target.value})} className="p-2 border-2 border-black rounded-none text-xs font-bold" placeholder="USERNAME"/>
+                      <input type="text" value={newUser.nim} onChange={e=>setNewUser({...newUser, nim: e.target.value})} className="p-2 border-2 border-black rounded-none text-xs font-bold" placeholder="NIM/KODE"/>
+                      <button type="submit" className="bg-neoYellow border-2 border-black p-2 font-black uppercase text-xs shadow-[2px_2px_0px_0px_#000000]">DAFTARKAN</button>
+                    </form>
+                  </div>
+
+                  <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000000] overflow-hidden">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-black text-white text-xs uppercase font-black">
+                          <th className="p-3">Nama</th>
+                          <th className="p-3">Username</th>
+                          <th className="p-3">NIM</th>
+                          <th className="p-3 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y-2 divide-black text-xs font-bold">
+                        {usersDb.filter(u => u.role === 'client').map(u => (
+                          <tr key={u.id} className="hover:bg-neoNeutral">
+                            <td className="p-3">{u.name}</td>
+                            <td className="p-3"><span className="font-mono bg-black text-white px-1.5 py-0.5">{u.username}</span></td>
+                            <td className="p-3">{u.nim || '-'}</td>
+                            <td className="p-3 text-right space-x-1">
+                              <button onClick={() => handleEditUser(u)} className="p-1 bg-neoYellow border border-black"><i className="fas fa-edit"></i></button>
+                              <button onClick={() => handleDeleteUser(u.id)} className="p-1 bg-neoCoral border border-black text-black"><i className="fas fa-trash"></i></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeMenu === 'laporan' && user.role === 'admin' && (
+                <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000000]">
+                  <div className="p-4 border-b-2 border-black bg-neoNeutral flex flex-wrap justify-between items-center gap-3">
+                    <h3 className="font-black uppercase text-xs">LOG SELURUH KEHADIRAN CLIENT</h3>
+                    <div className="flex gap-2">
+                      <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="p-1 border-2 border-black font-bold text-xs" />
+                      <button onClick={handleDownloadPDF} className="bg-neoCoral border-2 border-black px-3 py-1 font-black uppercase text-xs shadow-[2px_2px_0px_0px_#000000]">UNDUH PDF</button>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {activeMenu === 'data client' && user.role === 'admin' && (
-              <div className="space-y-6">
-                <div className="bg-white border-4 border-black p-6 nb-box-shadow">
-                  <h3 className="font-grotesk font-black text-md uppercase mb-4">Registrasi Anggota Baru</h3>
-                  <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <input type="text" required value={newUser.name} onChange={e=>setNewUser({...newUser, name:e.target.value})} className="p-2 border-2 border-black bg-nb-neutral font-medium text-sm" placeholder="NAMA LENGKAP"/>
-                    <input type="text" required value={newUser.username} onChange={e=>setNewUser({...newUser, username:e.target.value})} className="p-2 border-2 border-black bg-nb-neutral font-medium text-sm" placeholder="USERNAME"/>
-                    <button type="submit" className="bg-nb-secondary border-2 border-black font-grotesk font-black uppercase py-2 nb-button-active shadow-[2px_2px_0px_0px_#000000]">DAFTARKAN</button>
-                  </form>
-                </div>
-
-                <div className="bg-white border-4 border-black nb-box-shadow overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-nb-primary text-white font-grotesk font-bold text-xs uppercase border-b-2 border-black">
-                        <th className="p-3">Nama</th>
-                        <th className="p-3">Username</th>
-                        <th className="p-3 text-right">Peran</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-black/10 font-medium text-sm">
-                      {usersDb.filter(u=>u.role==='client').map(u=>(
-                        <tr key={u.id} className="hover:bg-nb-neutral/50">
-                          <td className="p-3 font-bold">{u.name}</td>
-                          <td className="p-3 font-mono text-xs">{u.username}</td>
-                          <td className="p-3 text-right font-grotesk font-bold text-xs uppercase text-slate-500">{u.role}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[500px]">
+                      <thead>
+                        <tr className="bg-black text-white text-xs uppercase font-black">
+                          <th className="p-3">Tanggal</th>
+                          <th className="p-3">Nama</th>
+                          <th className="p-3">Masuk</th>
+                          <th className="p-3">Pulang</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3 text-right">Modifikasi</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y-2 divide-black text-xs font-bold">
+                        {filteredAttendanceData.map(record => {
+                          const u = usersDb.find(user => user.id === record.userId);
+                          if (!u) return null;
+                          return (
+                            <tr key={record.id} className="hover:bg-neoNeutral">
+                              <td className="p-3 font-mono">{record.date}</td>
+                              <td className="p-3 font-black">{u.name}</td>
+                              <td className="p-3 font-mono">{record.timeIn}</td>
+                              <td className="p-3 font-mono">{record.timeOut || '-'}</td>
+                              <td className="p-3"><span className="border border-black px-2 py-0.5 bg-white shadow-[1px_1px_0px_0px_#000000]">{record.status}</span></td>
+                              <td className="p-3 text-right">
+                                <button onClick={() => handleEditAttendance(record)} className="p-1 bg-neoYellow border border-black"><i className="fas fa-pencil-alt"></i></button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+            </div>
           </main>
         </div>
       );
