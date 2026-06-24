@@ -10,7 +10,7 @@
   
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.12/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -1019,7 +1019,7 @@
             </div>
             <div className="space-y-5">
               <input type="text" id="logU" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all font-semibold text-slate-700 placeholder-slate-400 text-sm" placeholder="Masukkan Username..." onKeyDown={e => e.key === 'Enter' && handleLoginClick(e.target.value)} />
-              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200/50 transition-all transform active:scale-95 text-sm">Masuk Sistem</button>
+              <button onClick={() => handleLoginClick(document.getElementById('logU').value)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200/50 transition-all transform active:scale-[0.98] text-sm">Masuk Sistem</button>
             </div>
           </div>
         </div>
@@ -1054,7 +1054,7 @@
                    <p className="text-[8px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{user.role}</p>
                  </div>
                  
-                 <button onClick={handleLogout} className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm shrink-0">
+                 <button onClick={handleLogout} className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-[0.98] shadow-sm shrink-0">
                    <i className="fas fa-power-off text-xs"></i>
                    <span className="text-[9px] font-bold uppercase tracking-wider">Keluar</span>
                  </button>
