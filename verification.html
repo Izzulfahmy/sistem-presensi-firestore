@@ -5,39 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verifikasi Laporan Presensi</title>
   
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@700&family=Syne:wght@800&display=swap" rel="stylesheet">
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" crossorigin="anonymous"></script>
   
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brutal: { primary: '#000000', secondary: '#ffd23f', tertiary: '#ff6b6b', neutral: '#fffdf5', surface: '#ffffff', error: '#ff4d4d', cyan: '#7fdde0' }
-          },
-          fontFamily: { syne: ['Syne', 'sans-serif'], space: ['Space Grotesk', 'sans-serif'], inter: ['Inter', 'sans-serif'] },
-          boxShadow: {
-            brutal: '4px 4px 0px 0px #000000',
-            'brutal-lg': '12px 12px 0px 0px #000000',
-            'brutal-sm': '2px 2px 0px 0px #000000',
-          }
-        }
-      }
-    }
-  </script>
-
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   
   <style>
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-track { background: #fffdf5; border-left: 2px solid #000; border-top: 2px solid #000; }
-    ::-webkit-scrollbar-thumb { background: #000; border: 2px solid #fffdf5; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     
     @media print {
       body { background-color: white !important; }
@@ -67,7 +45,7 @@
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
 </head>
-<body class="bg-brutal-neutral text-black font-inter antialiased selection:bg-brutal-secondary selection:text-black">
+<body class="bg-slate-100 text-slate-800 font-sans antialiased selection:bg-blue-200">
   
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -144,8 +122,8 @@
       if (isLoading) {
         return (
           <div className="min-h-screen flex items-center justify-center flex-col">
-            <div className="w-16 h-16 border-4 border-black border-t-brutal-secondary rounded-none animate-spin mb-6"></div>
-            <p className="font-space font-bold text-black uppercase tracking-widest text-lg bg-white border-2 border-black px-4 py-2 shadow-brutal-sm">Memuat Dokumen...</p>
+            <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin mb-4"></div>
+            <p className="font-bold text-slate-500 animate-pulse tracking-widest text-[10px] uppercase">Memuat Dokumen Resmi...</p>
           </div>
         );
       }
@@ -177,11 +155,11 @@
 
       const SignatureBlock = ({ pj }) => (
           <div className="flex flex-col items-center text-center pt-4">
-              <p className="text-xs font-space font-bold text-black uppercase tracking-widest mb-12 bg-brutal-secondary px-2 py-1 border-2 border-black">{pj.jabatan}</p>
-              <div className="border-b-4 border-black pb-2 px-4 min-w-[220px]">
-                  <p className="font-syne font-black text-black uppercase tracking-wide text-lg">{pj.nama}</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-10">{pj.jabatan}</p>
+              <div className="border-b border-slate-800 pb-1 px-4 min-w-[180px]">
+                  <p className="font-black text-slate-900 uppercase tracking-wide text-sm">{pj.nama}</p>
               </div>
-              <p className="text-xs font-space font-bold text-black mt-2">{pj.nip && pj.nip !== '-' ? pj.nip : '\u00A0'}</p>
+              <p className="text-[10px] font-bold text-slate-600 mt-1">{pj.nip && pj.nip !== '-' ? pj.nip : '\u00A0'}</p>
           </div>
       );
 
@@ -196,79 +174,78 @@
       const displayVid = window.VID_PARAM !== "-" ? window.VID_PARAM : `${year}${monthStr}-XXXXXXXX`;
 
       return (
-        <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 print:py-0 print:px-0">
-          <div className="max-w-6xl mx-auto bg-white shadow-brutal-lg border-4 border-black p-8 sm:p-14 print-border-none relative">
-            
-            <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-8 border-b-8 border-black mb-10">
-              <div className="flex items-start gap-6">
-                <div className="w-16 h-16 md:w-20 md:h-20 bg-brutal-secondary border-4 border-black rounded-none flex items-center justify-center text-black shrink-0 shadow-brutal">
-                  <i className="fas fa-building text-3xl md:text-4xl"></i>
+        <div className="min-h-screen py-8 px-2 sm:px-6 lg:px-8 print:py-0 print:px-0">
+          <div className="max-w-6xl mx-auto bg-white shadow-xl border border-slate-300 p-8 sm:p-12 print-border-none relative">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-6 pb-6 border-b-2 border-slate-800 mb-6">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-md print:border print:border-slate-300">
+                  <i className="fas fa-building text-2xl"></i>
                 </div>
                 <div>
                   {settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '' && (
-                    <h2 className="text-lg md:text-xl font-space font-bold text-black tracking-widest uppercase leading-none mb-2 bg-brutal-tertiary inline-block px-2 py-1 border-2 border-black">
+                    <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none mb-0.5">
                       {settingsDb.namaKegiatan}
                     </h2>
                   )}
-                  <h1 className="text-3xl md:text-5xl font-syne font-black text-black uppercase leading-none mb-3">
+                  <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight uppercase leading-none mb-1">
                     {settingsDb.namaInstansi || 'Instansi Sistem Presensi'}
                   </h1>
                   {addressParts && (
-                    <p className="text-black font-bold font-inter text-sm md:text-base max-w-2xl leading-relaxed uppercase border-l-4 border-black pl-3 bg-brutal-neutral py-2 pr-2">
+                    <p className="text-slate-600 font-medium text-xs md:text-sm mt-1 max-w-2xl leading-relaxed">
                       {addressParts}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="flex flex-col md:items-end w-full md:w-auto bg-white md:bg-transparent p-5 md:p-0 rounded-none border-4 border-black shadow-[4px_4px_0_0_#000] md:shadow-none md:border-none">
-                 <div className="inline-flex items-center space-x-4 bg-brutal-cyan text-black px-5 py-3 rounded-none border-4 border-black mb-5 shadow-brutal-sm">
-                    <i className="fas fa-check-square text-3xl"></i>
-                    <span className="text-lg font-syne font-black uppercase tracking-wider">Terverifikasi</span>
+              <div className="flex flex-col md:items-end w-full md:w-auto bg-slate-50 md:bg-transparent p-4 md:p-0 rounded-xl md:rounded-none border border-slate-100 md:border-none">
+                 <div className="inline-flex items-center space-x-3 bg-emerald-50 text-emerald-800 px-4 py-2.5 rounded-xl border-2 border-emerald-200 mb-4 shadow-sm">
+                    <i className="fas fa-check-circle text-2xl text-emerald-500"></i>
+                    <span className="text-sm font-black uppercase tracking-widest text-emerald-700">Terverifikasi</span>
                  </div>
                  
-                 <table className="text-xs text-black font-space font-bold uppercase text-left md:text-right border-collapse">
+                 <table className="text-[10px] text-slate-500 font-mono tracking-widest uppercase text-left md:text-right">
                    <tbody>
-                     <tr className="border-b-2 border-black">
-                       <td className="pr-4 py-2 text-black bg-brutal-neutral border-r-2 border-black px-2">ID Dokumen</td>
-                       <td className="py-2 pl-2 text-black tabular-nums">{displayVid}</td>
+                     <tr>
+                       <td className="pr-3 pb-1 text-slate-400">ID Dokumen</td>
+                       <td className="pb-1 text-slate-800 font-bold">: {displayVid}</td>
                      </tr>
                      <tr>
-                       <td className="pr-4 py-2 text-black bg-brutal-neutral border-r-2 border-black px-2">Tipe Data</td>
-                       <td className="py-2 pl-2 text-black">Laporan Kehadiran</td>
+                       <td className="pr-3 text-slate-400">Tipe Data</td>
+                       <td className="text-slate-800 font-bold">: Laporan Kehadiran</td>
                      </tr>
                    </tbody>
                  </table>
               </div>
             </div>
 
-            <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between bg-white border-4 border-black p-6 sm:p-8 rounded-none shadow-[8px_8px_0_0_#000]">
+            <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-2xl border-l-4 border-l-blue-600">
               <div>
-                <h2 className="text-2xl md:text-3xl font-syne font-black text-black uppercase">Rekapitulasi Presensi</h2>
-                <p className="text-sm text-black font-space font-bold mt-2 uppercase tracking-wider bg-brutal-neutral inline-block px-2 border-2 border-black">Data Sistem Langsung</p>
+                <h2 className="text-lg md:text-xl font-black text-slate-800 uppercase tracking-widest">Rekapitulasi Presensi</h2>
+                <p className="text-xs text-slate-500 font-medium mt-1">Data ditarik secara langsung dari pangkalan data sistem.</p>
               </div>
-              <div className="mt-6 md:mt-0 bg-brutal-secondary px-6 py-4 rounded-none border-4 border-black shadow-brutal-sm text-left md:text-center">
-                <p className="text-[10px] font-space font-bold text-black uppercase tracking-widest border-b-2 border-black pb-1 mb-2">Periode Laporan</p>
-                <p className="text-lg sm:text-2xl text-black font-syne font-black uppercase">{monthName}</p>
+              <div className="mt-4 md:mt-0 bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm text-left md:text-center">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Periode Laporan</p>
+                <p className="text-sm sm:text-base text-blue-700 font-black uppercase tracking-widest">{monthName}</p>
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-6">
-              <table className="w-full text-left border-collapse min-w-[800px] border-4 border-black font-inter">
+            <div className="overflow-x-auto pb-4">
+              <table className="w-full text-left border-collapse min-w-[800px] border-2 border-slate-800">
                 <thead>
-                  <tr className="bg-brutal-secondary text-xs font-space font-bold uppercase text-black border-b-4 border-black">
-                    <th className="p-3 border-r-2 border-black text-center w-12">No</th>
-                    <th className="p-3 border-r-4 border-black whitespace-nowrap">Nama Lengkap</th>
+                  <tr className="bg-slate-100 text-[10px] font-black uppercase text-slate-700 border-b-2 border-slate-800">
+                    <th className="p-2 border-r border-slate-300 text-center w-10">No</th>
+                    <th className="p-2 border-r border-slate-300 whitespace-nowrap">Nama Lengkap</th>
                     {Array.from({ length: daysInMonth }, (_, i) => (
-                      <th key={i} className="p-3 border-r-2 border-black text-center w-8 bg-white">{i + 1}</th>
+                      <th key={i} className="p-2 border-r border-slate-300 text-center w-7">{i + 1}</th>
                     ))}
-                    <th className="p-3 border-r-2 border-l-2 border-black text-center bg-brutal-cyan" title="Hadir">H</th>
-                    <th className="p-3 border-r-2 border-black text-center bg-brutal-secondary" title="Izin">I</th>
-                    <th className="p-3 border-r-2 border-black text-center bg-brutal-tertiary" title="Sakit">S</th>
-                    <th className="p-3 text-center bg-brutal-error" title="Alpa">A</th>
+                    <th className="p-2 border-r border-slate-300 text-center text-green-700" title="Hadir">H</th>
+                    <th className="p-2 border-r border-slate-300 text-center text-purple-700" title="Izin">I</th>
+                    <th className="p-2 border-r border-slate-300 text-center text-yellow-700" title="Sakit">S</th>
+                    <th className="p-2 text-center text-red-700" title="Alpa">A</th>
                   </tr>
                 </thead>
-                <tbody className="text-[11px] sm:text-xs">
+                <tbody className="text-[10px] sm:text-xs">
                   {clients.map((client, index) => {
                     let totalH = 0, totalI = 0, totalS = 0, totalA = 0;
                     const dailyData = Array.from({ length: daysInMonth }, (_, d) => {
@@ -283,50 +260,48 @@
 
                       if (record) {
                         const s = record.status;
-                        if (['Hadir', 'Terlambat'].includes(s)) { totalH++; return s === 'Hadir' ? {val: 'H', color: 'bg-[#7fdde0] font-bold text-black border-2 border-black shadow-[inset_2px_2px_0_0_#000]'} : {val: 'T', color: 'bg-[#ffd23f] font-bold text-black border-2 border-black shadow-[inset_2px_2px_0_0_#000]'}; }
-                        if (s === 'Izin') { totalI++; return {val: 'I', color: 'bg-[#ffd23f] font-bold text-black border-2 border-black shadow-[inset_2px_2px_0_0_#000]'}; }
-                        if (s === 'Sakit') { totalS++; return {val: 'S', color: 'bg-[#ff6b6b] font-bold text-black border-2 border-black shadow-[inset_2px_2px_0_0_#000]'}; }
-                        if (s === 'Alpa') { totalA++; return {val: 'A', color: 'bg-[#ff4d4d] font-bold text-black border-2 border-black shadow-[inset_2px_2px_0_0_#000]'}; }
+                        if (['Hadir', 'Terlambat'].includes(s)) { totalH++; return s === 'Hadir' ? {val: 'H', color: 'text-green-700 font-bold bg-green-50/50'} : {val: 'T', color: 'text-orange-600 font-bold bg-orange-50/50'}; }
+                        if (s === 'Izin') { totalI++; return {val: 'I', color: 'text-purple-700 font-bold bg-purple-50/50'}; }
+                        if (s === 'Sakit') { totalS++; return {val: 'S', color: 'text-yellow-600 font-bold bg-yellow-50/50'}; }
+                        if (s === 'Alpa') { totalA++; return {val: 'A', color: 'text-red-600 font-bold bg-red-50/50'}; }
                         return {val: '', color: ''};
                       } else {
-                        if (isRoutineHoliday || isSpecialHoliday) return {val: 'L', color: 'bg-black text-white font-bold'};
-                        if (dayDate <= new Date() && hasActivityOnDate) { totalA++; return {val: 'A', color: 'bg-[#ff4d4d] font-bold text-black border-2 border-black shadow-[inset_2px_2px_0_0_#000]'}; }
+                        if (isRoutineHoliday || isSpecialHoliday) return {val: 'L', color: 'bg-red-500 text-white font-bold'};
+                        if (dayDate <= new Date() && hasActivityOnDate) { totalA++; return {val: 'A', color: 'text-red-600 font-bold bg-red-50/50'}; }
                         return {val: '', color: ''};
                       }
                     });
 
                     return (
-                      <tr key={client.id} className="border-b-2 border-black last:border-b-0 hover:bg-brutal-neutral">
-                        <td className="p-3 border-r-2 border-black text-center font-bold text-black">{index + 1}</td>
-                        <td className="p-3 border-r-4 border-black font-bold text-black whitespace-nowrap text-sm">{client.name}</td>
+                      <tr key={client.id} className="border-b border-slate-300 last:border-b-0">
+                        <td className="p-2 border-r border-slate-300 text-center font-medium text-slate-600">{index + 1}</td>
+                        <td className="p-2 border-r border-slate-300 font-bold text-slate-900 whitespace-nowrap">{client.name}</td>
                         {dailyData.map((data, i) => (
-                          <td key={i} className={`p-1 text-center border-r-2 border-black align-middle`}>
-                             <div className={`w-full h-full min-h-[24px] flex items-center justify-center ${data.color}`}>{data.val}</div>
-                          </td>
+                          <td key={i} className={`p-2 border-r border-slate-300 text-center ${data.color}`}>{data.val}</td>
                         ))}
-                        <td className="p-3 border-r-2 border-l-2 border-black text-center font-black text-black bg-white text-sm">{totalH}</td>
-                        <td className="p-3 border-r-2 border-black text-center font-black text-black bg-white text-sm">{totalI}</td>
-                        <td className="p-3 border-r-2 border-black text-center font-black text-black bg-white text-sm">{totalS}</td>
-                        <td className="p-3 text-center font-black text-black bg-white text-sm">{totalA}</td>
+                        <td className="p-2 border-r border-slate-300 text-center font-black text-green-700 bg-slate-50">{totalH}</td>
+                        <td className="p-2 border-r border-slate-300 text-center font-black text-purple-700 bg-slate-50">{totalI}</td>
+                        <td className="p-2 border-r border-slate-300 text-center font-black text-yellow-600 bg-slate-50">{totalS}</td>
+                        <td className="p-2 text-center font-black text-red-600 bg-slate-50">{totalA}</td>
                       </tr>
                     );
                   })}
-                  {clients.length === 0 && <tr><td colSpan={daysInMonth + 6} className="p-14 text-center text-black font-space font-bold uppercase tracking-widest text-lg">Tidak ada data client.</td></tr>}
+                  {clients.length === 0 && <tr><td colSpan={daysInMonth + 6} className="p-10 text-center text-slate-400 font-medium italic">Tidak ada data client.</td></tr>}
                 </tbody>
               </table>
-              <div className="mt-8 flex flex-wrap gap-4 text-xs text-black font-space font-bold uppercase tracking-wider bg-white p-4 border-4 border-black shadow-[4px_4px_0_0_#000]">
-                <span className="flex items-center gap-2 mr-2 border-r-2 border-black pr-4">Keterangan :</span>
-                <span className="flex items-center"><div className="w-4 h-4 bg-[#7fdde0] border-2 border-black mr-2"></div>H = Hadir</span>
-                <span className="flex items-center"><div className="w-4 h-4 bg-[#ffd23f] border-2 border-black mr-2"></div>T = Terlambat</span>
-                <span className="flex items-center"><div className="w-4 h-4 bg-[#ffd23f] border-2 border-black mr-2"></div>I = Izin</span>
-                <span className="flex items-center"><div className="w-4 h-4 bg-[#ff6b6b] border-2 border-black mr-2"></div>S = Sakit</span>
-                <span className="flex items-center"><div className="w-4 h-4 bg-[#ff4d4d] border-2 border-black mr-2"></div>A = Alpa</span>
-                <span className="flex items-center"><div className="w-4 h-4 bg-black border-2 border-black mr-2"></div>L = Libur</span>
+              <div className="mt-4 flex flex-wrap gap-4 text-[9px] text-slate-600 font-bold uppercase tracking-wider bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="flex items-center gap-1.5 mr-2">Keterangan :</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-green-100 border border-green-400 mr-1.5"></div>H = Hadir</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-orange-100 border border-orange-400 mr-1.5"></div>T = Terlambat</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-purple-100 border border-purple-400 mr-1.5"></div>I = Izin</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-yellow-100 border border-yellow-400 mr-1.5"></div>S = Sakit</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-red-100 border border-red-400 mr-1.5"></div>A = Alpa</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-red-500 mr-1.5"></div>L = Libur</span>
               </div>
             </div>
 
-            <div className="mt-16 pt-12 border-t-8 border-black">
-              <div className="flex flex-col space-y-16">
+            <div className="mt-12 pt-8 border-t border-slate-300">
+              <div className="flex flex-col space-y-12">
                 {htmlRows.map((row, rIdx) => {
                   if (row.type === 'center') {
                     return (
@@ -336,7 +311,7 @@
                     );
                   } else {
                     return (
-                      <div key={rIdx} className="flex flex-col sm:flex-row print:flex-row justify-between items-center w-full px-4 sm:px-12 gap-y-16 sm:gap-y-0 print:gap-y-0">
+                      <div key={rIdx} className="flex flex-col sm:flex-row print:flex-row justify-between items-center w-full px-4 sm:px-12 gap-y-12 sm:gap-y-0 print:gap-y-0">
                         <div className="w-full sm:w-1/2 print:w-1/2 flex justify-center">
                           <SignatureBlock pj={row.left} />
                         </div>
@@ -352,11 +327,11 @@
 
           </div>
 
-          <div className="text-center mt-12 no-print pb-16">
-             <button onClick={() => window.print()} className="bg-brutal-secondary text-black font-space font-bold py-5 px-14 border-4 border-black rounded-none shadow-[8px_8px_0_0_#000] hover:shadow-[12px_12px_0_0_#000] hover:-translate-y-1 active:translate-y-1 active:shadow-none transition-all uppercase tracking-widest text-lg">
-               <i className="fas fa-print mr-3 text-xl align-middle"></i> Cetak Laporan Ini
+          <div className="text-center mt-8 no-print pb-12">
+             <button onClick={() => window.print()} className="bg-slate-800 hover:bg-blue-600 text-white font-black py-4 px-12 rounded-full shadow-xl transition-all uppercase tracking-widest text-xs active:scale-95">
+               <i className="fas fa-print mr-2 text-lg align-middle"></i> Cetak Laporan Ini
              </button>
-             <p className="mt-6 text-xs text-black font-bold uppercase tracking-widest bg-white border-2 border-black inline-block px-4 py-2 shadow-[2px_2px_0_0_#000]">Gunakan orientasi Lanskap (Landscape) saat print tabel</p>
+             <p className="mt-3 text-[10px] text-slate-500 font-medium">Gunakan orientasi Lanskap (Landscape) pada browser untuk cetak tabel terbaik.</p>
           </div>
 
         </div>
