@@ -674,257 +674,247 @@
          }
       };
 
-      // FUNGSI UNDUH PDF DIREPOSISI KE TEMPAT YANG BENAR
       const handleDownloadPDF = async () => {
         const defaultDate = currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const defaultCity = settingsDb.kotaKabupaten || '';
 
-        const proceedToPopup = (qrUrlParam) => {
-          Swal.fire({
-            title: '<h2 class="text-xl font-bold text-slate-800">Pengaturan Cetak</h2>',
-            html: `
-              <div class="text-left mt-4 space-y-4">
-                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Kota Tanda Tangan</label>
-                  <input type="text" id="pdfCity" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultCity}" placeholder="Cth: Jember">
-                </div>
-                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tanggal Cetak</label>
-                  <input type="text" id="pdfDate" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultDate}">
-                </div>
+        Swal.fire({
+          title: '<h2 class="text-xl font-bold text-slate-800">Pengaturan Cetak</h2>',
+          html: `
+            <div class="text-left mt-4 space-y-4">
+              <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Kota Tanda Tangan</label>
+                <input type="text" id="pdfCity" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultCity}" placeholder="Cth: Jember">
               </div>
-            `,
-            showCancelButton: true, confirmButtonText: 'Unduh Sekarang', cancelButtonText: 'Batal', buttonsStyling: false,
-            customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-md', confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2', cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all', actions: 'flex flex-col w-full px-4 pb-4' },
-            preConfirm: () => { return { city: document.getElementById('pdfCity').value, date: document.getElementById('pdfDate').value } }
-          }).then((result) => {
-            if (result.isConfirmed) {
-              Swal.fire({ html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-red-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan PDF...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' } });
+              <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tanggal Cetak</label>
+                <input type="text" id="pdfDate" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultDate}">
+              </div>
+            </div>
+          `,
+          showCancelButton: true, confirmButtonText: 'Unduh Sekarang', cancelButtonText: 'Batal', buttonsStyling: false,
+          customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-md', confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2', cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all', actions: 'flex flex-col w-full px-4 pb-4' },
+          preConfirm: () => { return { city: document.getElementById('pdfCity').value, date: document.getElementById('pdfDate').value } }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            Swal.fire({ html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-red-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan PDF...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' } });
 
-              setTimeout(() => {
-                try {
-                  const { city, date } = result.value;
-                  const { jsPDF } = window.jspdf;
-                  const doc = new jsPDF({ orientation: 'landscape', format: [210, 330] });
+            setTimeout(() => {
+              try {
+                const { city, date } = result.value;
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', format: [210, 330] });
 
-                  const [yearStr, monthStr] = filterMonth.split('-');
-                  const year = parseInt(yearStr);
-                  const monthIndex = parseInt(monthStr) - 1; 
-                  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-                  const datesWithActivity = new Set(attendanceDb.map(a => a.date));
+                const [yearStr, monthStr] = filterMonth.split('-');
+                const year = parseInt(yearStr);
+                const monthIndex = parseInt(monthStr) - 1; 
+                const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+                const datesWithActivity = new Set(attendanceDb.map(a => a.date));
 
-                  const head = [['No', 'Nama Lengkap']];
-                  for (let i = 1; i <= daysInMonth; i++) head[0].push(i.toString()); 
-                  head[0].push('H', 'I', 'S', 'A');
+                const head = [['No', 'Nama Lengkap']];
+                for (let i = 1; i <= daysInMonth; i++) head[0].push(i.toString()); 
+                head[0].push('H', 'I', 'S', 'A');
 
-                  const colStyles = { 0: { halign: 'center', cellWidth: 8 }, 1: { halign: 'left' } };
-                  for (let i = 1; i <= daysInMonth; i++) colStyles[i + 1] = { halign: 'center', cellWidth: 7.2 }; 
-                  colStyles[daysInMonth + 2] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
-                  colStyles[daysInMonth + 3] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };
-                  colStyles[daysInMonth + 4] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
-                  colStyles[daysInMonth + 5] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };  
+                const colStyles = { 0: { halign: 'center', cellWidth: 8 }, 1: { halign: 'left' } };
+                for (let i = 1; i <= daysInMonth; i++) colStyles[i + 1] = { halign: 'center', cellWidth: 7.2 }; 
+                colStyles[daysInMonth + 2] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
+                colStyles[daysInMonth + 3] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };
+                colStyles[daysInMonth + 4] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
+                colStyles[daysInMonth + 5] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };  
 
-                  const body = [];
-                  const clients = usersDb.filter(u => u.role === 'client');
+                const body = [];
+                const clients = usersDb.filter(u => u.role === 'client');
 
-                  clients.forEach((client, index) => {
-                    const clientNameNim = client.name + '\n' + (client.nim || '-');
-                    const row = [index + 1, clientNameNim];
-                    let totalHadir = 0, totalIzin = 0, totalSakit = 0, totalAlpa = 0;
+                clients.forEach((client, index) => {
+                  const clientNameNim = client.name + '\n' + (client.nim || '-');
+                  const row = [index + 1, clientNameNim];
+                  let totalHadir = 0, totalIzin = 0, totalSakit = 0, totalAlpa = 0;
 
-                    for (let d = 1; d <= daysInMonth; d++) {
-                      const dayDate = new Date(year, monthIndex, d);
-                      const dateStr = getLocalYYYYMMDD(dayDate);
-                      const dayOfWeek = dayDate.getDay();
-                      const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-                      const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-                      const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
-                      const isSpecialHoliday = holidaysDb.find(h => h.date === dateStr);
+                  for (let d = 1; d <= daysInMonth; d++) {
+                    const dayDate = new Date(year, monthIndex, d);
+                    const dateStr = getLocalYYYYMMDD(dayDate);
+                    const dayOfWeek = dayDate.getDay();
+                    const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+                    const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+                    const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
+                    const isSpecialHoliday = holidaysDb.find(h => h.date === dateStr);
 
-                      const record = attendanceDb.find(a => a.userId === client.id && a.date === dateStr);
-                      const hasActivityOnDate = datesWithActivity.has(dateStr); 
+                    const record = attendanceDb.find(a => a.userId === client.id && a.date === dateStr);
+                    const hasActivityOnDate = datesWithActivity.has(dateStr); 
 
-                      if (record) {
-                        if (record.status === 'Hadir' || record.status === 'Terlambat') { row.push(record.status === 'Hadir' ? 'H' : 'T'); totalHadir++; }
-                        else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
-                        else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
-                        else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
-                        else { row.push(''); } 
-                      } else {
-                        if (isRoutineHoliday || isSpecialHoliday) row.push('L');
-                        else {
-                           if (dayDate <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
-                              if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('');
-                           } else row.push('');
-                        }
+                    if (record) {
+                      if (record.status === 'Hadir' || record.status === 'Terlambat') { row.push(record.status === 'Hadir' ? 'H' : 'T'); totalHadir++; }
+                      else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
+                      else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
+                      else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
+                      else { row.push(''); } 
+                    } else {
+                      if (isRoutineHoliday || isSpecialHoliday) row.push('L');
+                      else {
+                         if (dayDate <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
+                            if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('');
+                         } else row.push('');
                       }
                     }
-                    row.push(totalHadir.toString(), totalIzin.toString(), totalSakit.toString(), totalAlpa.toString());
-                    body.push(row);
-                  });
-
-                  const pageWidth = doc.internal.pageSize.getWidth();
-                  const monthName = new Date(year, monthIndex).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                  
-                  let currentY = 14;
-
-                  if (settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '') {
-                    doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
-                    const splitKegiatan = doc.splitTextToSize(settingsDb.namaKegiatan.toUpperCase(), 200);
-                    doc.text(splitKegiatan, 8, currentY);
-                    currentY += (splitKegiatan.length * 5); 
                   }
+                  row.push(totalHadir.toString(), totalIzin.toString(), totalSakit.toString(), totalAlpa.toString());
+                  body.push(row);
+                });
 
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const monthName = new Date(year, monthIndex).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                
+                let currentY = 14;
+
+                if (settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '') {
                   doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
-                  const splitInstansi = doc.splitTextToSize((settingsDb.namaInstansi || '').toUpperCase(), 200);
-                  doc.text(splitInstansi, 8, currentY);
-                  currentY += (splitInstansi.length * 5) + 2; 
-
-                  const addressParts = [settingsDb.alamat, settingsDb.desaKecamatan, settingsDb.kotaKabupaten, settingsDb.negara, settingsDb.kodePos].filter(Boolean).join(', ');
-                  if (addressParts) {
-                    doc.setFontSize(8).setFont("helvetica", "normal").setTextColor(100, 100, 100);
-                    const splitAddress = doc.splitTextToSize(addressParts, 130); 
-                    doc.text(splitAddress, 8, currentY);
-                    currentY += (splitAddress.length * 4); 
-                  }
-                  const rightTextX = pageWidth - 28;
-                  doc.setFontSize(12).setFont("helvetica", "bold").setTextColor(15, 23, 42).text("LAPORAN REKAPITULASI PRESENSI", rightTextX, 14, { align: 'right' });
-                  doc.setFontSize(9).setFont("helvetica", "normal").setTextColor(71, 85, 105).text(`Periode: ${monthName}`, rightTextX, 19, { align: 'right' });
-                  
-                  const currentVerifMatch = verificationsDb.find(v => v.month === filterMonth);
-                  const docId = currentVerifMatch ? currentVerifMatch.vid : `${year}${monthStr}-${Date.now().toString(16).substring(4).toUpperCase()}`;
-                  doc.setFontSize(8).setFont("helvetica", "bold").setTextColor(100, 100, 100).text(`ID DOKUMEN: ${docId}`, rightTextX, 23, { align: 'right' });
-
-                  const lineY = Math.max(29, currentY + 3); 
-                  doc.setLineWidth(0.5).setDrawColor(226, 232, 240).line(8, lineY, pageWidth - 8, lineY);
-
-                  doc.autoTable({
-                    startY: lineY + 4, margin: { left: 8, right: 8 }, head: head, body: body, theme: 'grid',
-                    styles: { fontSize: 7.5, halign: 'center', valign: 'middle', cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
-                    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.1 },
-                    columnStyles: colStyles,
-                    didParseCell: function(data) {
-                       const isColumnDate = data.column.index > 1 && data.column.index <= daysInMonth + 1;
-                       let isHolidayCol = false;
-                       if (isColumnDate) {
-                          const dayDate = new Date(year, monthIndex, data.column.index - 1);
-                          const dateStr = getLocalYYYYMMDD(dayDate);
-                          const dayOfWeek = dayDate.getDay();
-                          const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-                          const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-                          isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
-                       }
-                       if (data.section === 'head') {
-                         data.cell.styles.fillColor = [255, 255, 255]; 
-                         data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
-                       }
-                       if (data.section === 'body') {
-                         if (data.column.index === 0 || data.column.index === 1) { 
-                            data.cell.styles.textColor = [15, 23, 42]; 
-                            data.cell.styles.fontStyle = 'bold'; 
-                            data.cell.styles.fontSize = 8.5; 
-                         }
-                         if (isColumnDate) {
-                           const val = data.cell.raw;
-                           if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
-                           else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
-                           else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
-                           else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
-                           else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                           else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                         } else if (data.column.index >= daysInMonth + 2) {
-                            if (data.column.index === daysInMonth + 2) data.cell.styles.textColor = [21, 128, 61]; 
-                            if (data.column.index === daysInMonth + 3) data.cell.styles.textColor = [147, 51, 234]; 
-                            if (data.column.index === daysInMonth + 4) data.cell.styles.textColor = [234, 179, 8]; 
-                            if (data.column.index === daysInMonth + 5) data.cell.styles.textColor = [220, 38, 38]; 
-                         }
-                       }
-                    }
-                  });
-
-                  const finalY = doc.lastAutoTable.finalY || 28;
-                  doc.setFontSize(8).setTextColor(100, 100, 100);
-                  doc.text("Keterangan: H (Hadir), T (Terlambat), I (Izin), S (Sakit), A (Alpa/Tidak Hadir), L (Libur)", 14, finalY + 6);
-
-                  doc.setFontSize(10).setTextColor(0, 0, 0);
-                  let signatureY = finalY + 35; 
-                  
-                  let pjs = [];
-                  try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
-                  if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: '...................................', nip: 'NIP/NIM.'}];
-
-                  const nPjs = pjs.length;
-                  const totalRows = Math.ceil(nPjs / 2);
-                  const colLeftX = pageWidth * 0.25;
-                  const colRightX = pageWidth * 0.75;
-                  const colCenterX = pageWidth * 0.5;
-
-                  const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
-                  const locationDateText = city ? `${city}, ${date}` : date;
-                  doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
-                  doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
-
-                  pjs.forEach((pj, idx) => {
-                     let row, colX;
-                     if (nPjs % 2 !== 0) { 
-                        if (idx === 0) {
-                           row = totalRows - 1; 
-                           colX = colCenterX;   
-                        } else {
-                           let pairIndex = Math.ceil(idx / 2);
-                           row = totalRows - 1 - pairIndex;                
-                           colX = (idx % 2 === 1) ? colRightX : colLeftX; 
-                        }
-                     } else { 
-                        let pairIndex = Math.floor(idx / 2);
-                        row = totalRows - 1 - pairIndex;               
-                        colX = (idx % 2 === 0) ? colRightX : colLeftX; 
-                     }
-
-                     const currentY = signatureY + (row * 35);
-                     doc.setFont("helvetica", "normal").text(pj.jabatan || "...................................", colX, currentY, { align: "center" });
-                     doc.setFont("helvetica", "bold").text(pj.nama || "...................................", colX, currentY + 20, { align: "center" });
-                     doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
-                  });
-
-                  const savePDF = () => {
-                     doc.save(`Rekap_Presensi_${monthName.replace(' ', '_')}.pdf`);
-                     Swal.close();
-                  };
-
-                  if (qrUrlParam) {
-                     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=${encodeURIComponent(qrUrlParam)}`;
-                     const img = new Image();
-                     img.crossOrigin = "Anonymous";
-                     img.onload = () => {
-                         const canvas = document.createElement('canvas');
-                         canvas.width = img.width; canvas.height = img.height;
-                         const ctx = canvas.getContext('2d');
-                         ctx.drawImage(img, 0, 0);
-                         const dataURL = canvas.toDataURL('image/png');
-                         doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
-                         savePDF();
-                     };
-                     img.onerror = () => savePDF();
-                     img.src = qrUrl;
-                  } else {
-                     savePDF(); 
-                  }
-                } catch (error) {
-                  console.error(error);
-                  Swal.fire('Error', 'Gagal memproses file PDF.', 'error');
+                  const splitKegiatan = doc.splitTextToSize(settingsDb.namaKegiatan.toUpperCase(), 200);
+                  doc.text(splitKegiatan, 8, currentY);
+                  currentY += (splitKegiatan.length * 5); 
                 }
-              }, 100);
-            }
-          });
-        };
 
-        const currentVerif = verificationsDb.find(v => v.month === filterMonth);
-        if (!currentVerif) {
-           proceedToPopup(null);
-        } else {
-           proceedToPopup(currentVerif.url);
-        }
+                doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
+                const splitInstansi = doc.splitTextToSize((settingsDb.namaInstansi || '').toUpperCase(), 200);
+                doc.text(splitInstansi, 8, currentY);
+                currentY += (splitInstansi.length * 5) + 2; 
+
+                const addressParts = [settingsDb.alamat, settingsDb.desaKecamatan, settingsDb.kotaKabupaten, settingsDb.negara, settingsDb.kodePos].filter(Boolean).join(', ');
+                if (addressParts) {
+                  doc.setFontSize(8).setFont("helvetica", "normal").setTextColor(100, 100, 100);
+                  const splitAddress = doc.splitTextToSize(addressParts, 130); 
+                  doc.text(splitAddress, 8, currentY);
+                  currentY += (splitAddress.length * 4); 
+                }
+                const rightTextX = pageWidth - 28;
+                doc.setFontSize(12).setFont("helvetica", "bold").setTextColor(15, 23, 42).text("LAPORAN REKAPITULASI PRESENSI", rightTextX, 14, { align: 'right' });
+                doc.setFontSize(9).setFont("helvetica", "normal").setTextColor(71, 85, 105).text(`Periode: ${monthName}`, rightTextX, 19, { align: 'right' });
+                
+                const currentVerifMatch = verificationsDb.find(v => v.month === filterMonth);
+                const docId = currentVerifMatch ? currentVerifMatch.vid : `${year}${monthStr}-${Date.now().toString(16).substring(4).toUpperCase()}`;
+                doc.setFontSize(8).setFont("helvetica", "bold").setTextColor(100, 100, 100).text(`ID DOKUMEN: ${docId}`, rightTextX, 23, { align: 'right' });
+
+                const lineY = Math.max(29, currentY + 3); 
+                doc.setLineWidth(0.5).setDrawColor(226, 232, 240).line(8, lineY, pageWidth - 8, lineY);
+
+                doc.autoTable({
+                  startY: lineY + 4, margin: { left: 8, right: 8 }, head: head, body: body, theme: 'grid',
+                  styles: { fontSize: 7.5, halign: 'center', valign: 'middle', cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
+                  headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.1 },
+                  columnStyles: colStyles,
+                  didParseCell: function(data) {
+                     const isColumnDate = data.column.index > 1 && data.column.index <= daysInMonth + 1;
+                     let isHolidayCol = false;
+                     if (isColumnDate) {
+                        const dayDate = new Date(year, monthIndex, data.column.index - 1);
+                        const dateStr = getLocalYYYYMMDD(dayDate);
+                        const dayOfWeek = dayDate.getDay();
+                        const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+                        const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+                        isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
+                     }
+                     if (data.section === 'head') {
+                       data.cell.styles.fillColor = [255, 255, 255]; 
+                       data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
+                     }
+                     if (data.section === 'body') {
+                       if (data.column.index === 0 || data.column.index === 1) { 
+                          data.cell.styles.textColor = [15, 23, 42]; 
+                          data.cell.styles.fontStyle = 'bold'; 
+                          data.cell.styles.fontSize = 8.5; 
+                       }
+                       if (isColumnDate) {
+                         const val = data.cell.raw;
+                         if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
+                         else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
+                         else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
+                         else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
+                         else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+                         else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+                       } else if (data.column.index >= daysInMonth + 2) {
+                          if (data.column.index === daysInMonth + 2) data.cell.styles.textColor = [21, 128, 61]; 
+                          if (data.column.index === daysInMonth + 3) data.cell.styles.textColor = [147, 51, 234]; 
+                          if (data.column.index === daysInMonth + 4) data.cell.styles.textColor = [234, 179, 8]; 
+                          if (data.column.index === daysInMonth + 5) data.cell.styles.textColor = [220, 38, 38]; 
+                       }
+                     }
+                  }
+                });
+
+                const finalY = doc.lastAutoTable.finalY || 28;
+                doc.setFontSize(8).setTextColor(100, 100, 100);
+                doc.text("Keterangan: H (Hadir), T (Terlambat), I (Izin), S (Sakit), A (Alpa/Tidak Hadir), L (Libur)", 14, finalY + 6);
+
+                doc.setFontSize(10).setTextColor(0, 0, 0);
+                let signatureY = finalY + 35; 
+                
+                let pjs = [];
+                try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
+                if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: '...................................', nip: 'NIP/NIM.'}];
+
+                const nPjs = pjs.length;
+                const totalRows = Math.ceil(nPjs / 2);
+                const colLeftX = pageWidth * 0.25;
+                const colRightX = pageWidth * 0.75;
+                const colCenterX = pageWidth * 0.5;
+
+                const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
+                const locationDateText = city ? `${city}, ${date}` : date;
+                doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
+                doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
+
+                pjs.forEach((pj, idx) => {
+                   let row, colX;
+                   if (nPjs % 2 !== 0) { 
+                      if (idx === 0) {
+                         row = totalRows - 1; 
+                         colX = colCenterX;   
+                      } else {
+                         let pairIndex = Math.ceil(idx / 2);
+                         row = totalRows - 1 - pairIndex;                
+                         colX = (idx % 2 === 1) ? colRightX : colLeftX; 
+                      }
+                   } else { 
+                      let pairIndex = Math.floor(idx / 2);
+                      row = totalRows - 1 - pairIndex;               
+                      colX = (idx % 2 === 0) ? colRightX : colLeftX; 
+                   }
+
+                   const currentY = signatureY + (row * 35);
+                   doc.setFont("helvetica", "normal").text(pj.jabatan || "...................................", colX, currentY, { align: "center" });
+                   doc.setFont("helvetica", "bold").text(pj.nama || "...................................", colX, currentY + 20, { align: "center" });
+                   doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
+                });
+
+                const savePDF = () => {
+                   doc.save(`Rekap_Presensi_${monthName.replace(' ', '_')}.pdf`);
+                   Swal.close();
+                };
+
+                if (qrUrlParam) {
+                   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=${encodeURIComponent(qrUrlParam)}`;
+                   const img = new Image();
+                   img.crossOrigin = "Anonymous";
+                   img.onload = () => {
+                       const canvas = document.createElement('canvas');
+                       canvas.width = img.width; canvas.height = img.height;
+                       const ctx = canvas.getContext('2d');
+                       ctx.drawImage(img, 0, 0);
+                       const dataURL = canvas.toDataURL('image/png');
+                       doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
+                       savePDF();
+                   };
+                   img.onerror = () => savePDF();
+                   img.src = qrUrl;
+                } else {
+                   savePDF(); 
+                }
+              } catch (error) {
+                console.error(error);
+                Swal.fire('Error', 'Gagal memproses file PDF.', 'error');
+              }
+            }, 100);
+          }
+        });
       };
 
       const handleLogout = () => {
@@ -1019,7 +1009,7 @@
         });
       };
 
-      // VARIABEL PEMERIKSAAN LAPORAN DATA (DIREPOSISI SECARA VALID)
+      // POSISI VALID: DEKLARASI VARIABEL PEMERIKSA DATA SEBELUM RENDER UTAMA
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
@@ -1446,7 +1436,6 @@
                           className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all h-[38px]" 
                         />
 
-                        {/* Tombol Tambah Presensi Massal (Simbol Saja) */}
                         <button 
                           onClick={handleAddBulkAttendance}
                           className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0"
@@ -1455,7 +1444,6 @@
                           <i className="fas fa-calendar-plus text-lg"></i>
                         </button>
                         
-                        {/* Tombol Buka Verifikasi (Simbol Saja) */}
                         {hasData && currentVerif && (
                            <a 
                              href={currentVerif.url} 
@@ -1478,7 +1466,6 @@
                            </button>
                         )}
 
-                        {/* Tombol Unduh PDF (Simbol Saja) */}
                         <button 
                           onClick={handleDownloadPDF} 
                           className="bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0"
@@ -1669,15 +1656,15 @@
                         return pjs.map((pj, idx) => (
                           <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3 relative group">
                             <div className="sm:col-span-4">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jabatan</label>
+                              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jabatan</label>
                               <input type="text" value={pj.jabatan} onChange={e => { const np = [...pjs]; np[idx].jabatan = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Kepala Sekolah" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-normal text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
                             </div>
                             <div className="sm:col-span-4">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
+                              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
                               <input type="text" value={pj.nama} onChange={e => { const np = [...pjs]; np[idx].nama = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Budi Santoso, M.Pd" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
                             </div>
                             <div className="sm:col-span-3">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIP / NIM / Kustom</label>
+                              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIP / NIM / Kustom</label>
                               <input type="text" value={pj.nip} onChange={e => { const np = [...pjs]; np[idx].nip = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: NIP. 1980..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
                             </div>
                             <div className="sm:col-span-1 flex flex-col justify-end">
