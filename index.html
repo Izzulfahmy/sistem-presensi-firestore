@@ -286,7 +286,7 @@
                     <div className="mt-1 z-10 relative shrink-0 pt-1 border-t border-slate-200/50 space-y-0.5">
                       {isRoutineHoliday && specialHolidays.length === 0 && <span className="text-[7px] sm:text-[9px] text-red-400 font-medium uppercase tracking-wider opacity-80 block">Libur</span>}
                       {specialHolidays.map((sh, sIdx) => (
-                        <div key={sIdx} className="bg-red-500 text-white px-1 py-0.5 rounded shadow-sm">
+                        <div key={sh.id || sIdx} className="bg-red-500 text-white px-1 py-0.5 rounded shadow-sm">
                           <p className="text-[7px] sm:text-[9px] leading-tight font-medium line-clamp-1">{sh.description}</p>
                         </div>
                       ))}
@@ -674,7 +674,7 @@
          }
       };
 
-      // MENYISIPKAN KEMBALI FUNGSI UNDUH REKAP PDF YANG TIDAK SENGAJA TERHAPUS
+      // FUNGSI UNDUH PDF DIREPOSISI KE TEMPAT YANG BENAR
       const handleDownloadPDF = async () => {
         const defaultDate = currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const defaultCity = settingsDb.kotaKabupaten || '';
@@ -1019,11 +1019,10 @@
         });
       };
 
-      const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
-      const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
-      
+      // VARIABEL PEMERIKSAAN LAPORAN DATA (DIREPOSISI SECARA VALID)
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
+      const hasData = filteredAttendanceData.length > 0;
 
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
