@@ -287,7 +287,7 @@
       const [isSavingSettings, setIsSavingSettings] = useState(false); 
       
       const [isSystemEmpty, setIsSystemEmpty] = useState(false); 
-      const [regForm, setRegForm] = useState({ name: '', username: '' }); // Form registrasi diperbarui (field nim dihapus)
+      const [regForm, setRegForm] = useState({ name: '', username: '' });
 
       const [user, setUser] = useState(() => {
         try {
@@ -494,7 +494,7 @@
             name: regForm.name.trim(),
             username: regForm.username.trim().toLowerCase(),
             role: 'admin',
-            nim: null // NIM diatur null secara eksplisit di database untuk role admin
+            nim: null 
           };
 
           await window.fs.setDoc(window.fs.doc(window.db, "users", mainAdmin.id.toString()), mainAdmin);
@@ -513,6 +513,101 @@
           console.error(err);
           Swal.fire('Gagal Setup', 'Terjadi kesalahan: ' + err.message, 'error');
         }
+      };
+
+      // FITUR BARU: Handler untuk Menambah Presensi Massal Admin Secara Fleksibel
+      const handleAddBulkAttendance = () => {
+        const [yearStr, monthStr] = filterMonth.split('-');
+        const y = parseInt(yearStr);
+        const mIdx = parseInt(monthStr) - 1;
+        const totalDays = new Date(y, mIdx + 1, 0).getDate();
+
+        // 1. Kumpulkan semua tanggal yang sudah memiliki rekaman aktivitas siswa
+        const existingDates = new Set(attendanceDb.filter(a => a.date.startsWith(filterMonth)).map(a => a.date));
+        
+        // 2. Buat daftar tanggal yang belum terisi di bulan tersebut
+        let availableDates = [];
+        for (let d = 1; d <= totalDays; d++) {
+          const dateObj = new Date(y, mIdx, d);
+          const dateStr = getLocalYYYYMMDD(dateObj);
+          if (!existingDates.has(dateStr)) {
+            availableDates.push({
+              value: dateStr,
+              label: dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+            });
+          }
+        }
+
+        if (availableDates.length === 0) {
+          return Swal.fire({ icon: 'info', title: 'Pemberitahuan', text: 'Semua tanggal pada bulan ini sudah memiliki data presensi.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+        }
+
+        // 3. Tampilkan popup pilihan tanggal eksklusif yang belum ada datanya
+        Swal.fire({
+          title: '<h2 class="text-lg font-bold text-slate-800">Tambah Presensi Massal</h2>',
+          html: `
+            <div class="text-left mt-2">
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Pilih Tanggal Kehadiran</label>
+                <select id="bulk-date-select" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm">
+                  ${availableDates.map(d => `<option value="${data.value}">${d.label}</option>`).join('')}
+                </select>
+              </div>
+              <p class="text-[10px] text-slate-400 font-semibold mt-2 px-1 leading-relaxed">
+                *Aksi ini akan mendaftarkan seluruh siswa/client sebagai <b>Hadir</b> dengan jam masuk & pulang default pada tanggal yang dipilih.
+              </p>
+            </div>
+          `,
+          showCancelButton: true, confirmButtonText: 'Simpan Kehadiran', cancelButtonText: 'Batal', buttonsStyling: false,
+          customClass: { 
+            popup: 'swal2-minimalist-popup w-[90%] max-w-md', 
+            confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2 mt-4 text-sm', 
+            cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all text-sm', 
+            actions: 'flex flex-col w-full p-0' 
+          }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            const selectedDate = document.getElementById('bulk-date-select').value;
+            const clients = usersDb.filter(u => u.role === 'client');
+
+            if (clients.length === 0) {
+              return Swal.fire({ icon: 'warning', title: 'Gagal', text: 'Tidak ada data siswa/client yang terdaftar untuk dimasukkan.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            }
+
+            Swal.fire({
+              html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyimpan Kehadiran Massal...</p></div>',
+              allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }
+            });
+
+            try {
+              let newRecords = [];
+              // Gabungkan format titik kustom instansi atau gunakan format default
+              const timeInDefault = settingsDb.jamMasuk || "08:00";
+              const timeOutDefault = settingsDb.jamPulang || "17:00";
+
+              for (const client of clients) {
+                const recId = Date.now() + Math.floor(Math.random() * 1000) + client.id;
+                const newRecord = {
+                  id: recId,
+                  userId: client.id,
+                  date: selectedDate,
+                  timeIn: timeInDefault,
+                  timeOut: timeOutDefault,
+                  status: 'Hadir'
+                };
+                
+                await window.fs.setDoc(window.fs.doc(window.db, "attendance", recId.toString()), newRecord);
+                newRecords.push(newRecord);
+              }
+
+              setAttendanceDb(prev => [...prev, ...newRecords]);
+              Swal.fire({ icon: 'success', title: 'Berhasil', text: `Presensi massal berhasil ditambahkan pada tanggal ${selectedDate}`, timer: 1800, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            } catch (err) {
+              console.error(err);
+              Swal.fire('Error', 'Gagal memproses data kehadiran massal.', 'error');
+            }
+          }
+        });
       };
 
       const handleLogout = () => {
@@ -1071,7 +1166,7 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // GUARD SCREEN 1: BILA DATABASE KOSONG, TAMPILKAN REGISTER UTAMA (KOLOM NIM DIHAPUS)
+      // GUARD SCREEN 1: BILA DATABASE KOSONG, TAMPILKAN REGISTER UTAMA
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 relative z-10">
@@ -1488,29 +1583,37 @@
                     <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
                       <h3 className="text-lg font-bold text-slate-800 flex items-center"><i className="fas fa-file-signature mr-2 text-blue-600"></i>Rekapitulasi Kehadiran</h3>
                       
-                      <div className="flex items-center space-x-3 w-full md:w-auto">
+                      <div className="flex items-center space-x-3 w-full md:w-auto flex-wrap gap-y-2">
                         <input 
                           type="month" 
                           value={filterMonth} 
                           onChange={e => setFilterMonth(e.target.value)} 
-                          className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+                          className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all h-[38px]" 
                         />
+
+                        {/* FITUR BARU: Tombol Tambah Presensi Massal Khusus Admin */}
+                        <button 
+                          onClick={handleAddBulkAttendance}
+                          className="bg-blue-600 hover:bg-blue-700 border border-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm h-[38px]"
+                        >
+                          <i className="fas fa-calendar-plus mr-2"></i><span>Tambah Presensi</span>
+                        </button>
                         
                         {hasData && currentVerif && (
-                           <a href={currentVerif.url} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-500 hover:text-white border border-emerald-200 text-emerald-600 font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm">
+                           <a href={currentVerif.url} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-500 hover:text-white border border-emerald-200 text-emerald-600 font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm h-[38px]">
                              <i className="fas fa-external-link-alt md:mr-2"></i><span className="hidden md:inline">Buka Verifikasi</span>
                            </a>
                         )}
 
                         {hasData && !currentVerif && (
-                           <button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 hover:text-white border border-blue-200 text-blue-600 font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm">
+                           <button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 hover:text-white border border-blue-200 text-blue-600 font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm h-[38px]">
                              <i className="fas fa-link md:mr-2"></i><span className="hidden md:inline">Buat Link Verifikasi</span>
                            </button>
                         )}
 
                         <button 
                           onClick={handleDownloadPDF} 
-                          className="bg-red-50 hover:bg-red-500 hover:text-white border border-red-200 text-red-600 font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm"
+                          className="bg-red-50 hover:bg-red-500 hover:text-white border border-red-200 text-red-600 font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm h-[38px]"
                         >
                           <i className="fas fa-file-pdf md:mr-2"></i><span className="hidden md:inline">Unduh PDF</span>
                         </button>
@@ -1541,7 +1644,7 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider 
-                                  ${['Hadir','Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' 
+                                  ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' 
                                   : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200'
                                   : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>
                                    {record.status}
