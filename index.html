@@ -733,244 +733,257 @@
         });
       };
 
+      // REPERBAIKAN UTAMA: Perbaikan parameter dinamis qrUrlParam dan parsing baris tabel jspdf
       const handleDownloadPDF = async () => {
         const defaultDate = currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const defaultCity = settingsDb.kotaKabupaten || '';
 
-        Swal.fire({
-          title: '<h2 class="text-xl font-bold text-slate-800">Pengaturan Cetak</h2>',
-          html: `
-            <div class="text-left mt-4 space-y-4">
-              <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Kota Tanda Tangan</label>
-                <input type="text" id="pdfCity" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultCity}" placeholder="Cth: Jember">
+        const proceedToPopup = (qrUrlParam) => {
+          Swal.fire({
+            title: '<h2 class="text-xl font-bold text-slate-800">Pengaturan Cetak</h2>',
+            html: `
+              <div class="text-left mt-4 space-y-4">
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Kota Tanda Tangan</label>
+                  <input type="text" id="pdfCity" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultCity}" placeholder="Cth: Jember">
+                </div>
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tanggal Cetak</label>
+                  <input type="text" id="pdfDate" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultDate}">
+                </div>
               </div>
-              <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tanggal Cetak</label>
-                <input type="text" id="pdfDate" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${defaultDate}">
-              </div>
-            </div>
-          `,
-          showCancelButton: true, confirmButtonText: 'Unduh Sekarang', cancelButtonText: 'Batal', buttonsStyling: false,
-          customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-md', confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2', cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all', actions: 'flex flex-col w-full px-4 pb-4' },
-          preConfirm: () => { return { city: document.getElementById('pdfCity').value, date: document.getElementById('pdfDate').value } }
-        }).then((result) => {
-          if (result.isConfirmed) {
-            Swal.fire({ html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-red-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan PDF...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' } });
+            `,
+            showCancelButton: true, confirmButtonText: 'Unduh Sekarang', cancelButtonText: 'Batal', buttonsStyling: false,
+            customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-md', confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2', cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all', actions: 'flex flex-col w-full px-4 pb-4' },
+            preConfirm: () => { return { city: document.getElementById('pdfCity').value, date: document.getElementById('pdfDate').value } }
+          }).then((result) => {
+            if (result.isConfirmed) {
+              Swal.fire({ html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-red-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan PDF...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' } });
 
-            setTimeout(() => {
-              try {
-                const { city, date } = result.value;
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({ orientation: 'landscape', format: [210, 330] });
+              setTimeout(() => {
+                try {
+                  const { city, date } = result.value;
+                  const { jsPDF } = window.jspdf;
+                  const doc = new jsPDF({ orientation: 'landscape', format: [210, 330] });
 
-                const [yearStr, monthStr] = filterMonth.split('-');
-                const year = parseInt(yearStr);
-                const monthIndex = parseInt(monthStr) - 1; 
-                const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-                const datesWithActivity = new Set(attendanceDb.map(a => a.date));
+                  const [yearStr, monthStr] = filterMonth.split('-');
+                  const year = parseInt(yearStr);
+                  const monthIndex = parseInt(monthStr) - 1; 
+                  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+                  const datesWithActivity = new Set(attendanceDb.map(a => a.date));
 
-                const head = [['No', 'Nama Lengkap']];
-                for (let i = 1; i <= daysInMonth; i++) head[0].push(i.toString()); 
-                head[0].push('H', 'I', 'S', 'A');
+                  const head = [['No', 'Nama Lengkap']];
+                  for (let i = 1; i <= daysInMonth; i++) head[0].push(i.toString()); 
+                  head[0].push('H', 'I', 'S', 'A');
 
-                const colStyles = { 0: { halign: 'center', cellWidth: 8 }, 1: { halign: 'left' } };
-                for (let i = 1; i <= daysInMonth; i++) colStyles[i + 1] = { halign: 'center', cellWidth: 7.2 }; 
-                
-                const body = [];
-                const clients = usersDb.filter(u => u.role === 'client');
+                  const colStyles = { 0: { halign: 'center', cellWidth: 8 }, 1: { halign: 'left' } };
+                  for (let i = 1; i <= daysInMonth; i++) colStyles[i + 1] = { halign: 'center', cellWidth: 7.2 }; 
+                  colStyles[daysInMonth + 2] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
+                  colStyles[daysInMonth + 3] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };
+                  colStyles[daysInMonth + 4] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
+                  colStyles[daysInMonth + 5] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };  
 
-                clients.forEach((client, index) => {
-                  const clientNameNim = client.name + '\n' + (client.nim || '-');
-                  const row = [index + 1, clientNameNim];
-                  let totalHadir = 0, totalIzin = 0, totalSakit = 0, totalAlpa = 0;
+                  const body = [];
+                  const clients = usersDb.filter(u => u.role === 'client');
 
-                  for (let d = 1; d <= daysInMonth; d++) {
-                    const dayDate = new Date(year, monthIndex, d);
-                    const dateStr = getLocalYYYYMMDD(dayDate);
-                    const dayOfWeek = dayDate.getDay();
-                    const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-                    const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-                    const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
-                    const isSpecialHoliday = holidaysDb.find(h => h.date === dateStr);
+                  clients.forEach((client, index) => {
+                    const clientNameNim = client.name + '\n' + (client.nim || '-');
+                    const row = [index + 1, clientNameNim];
+                    let totalHadir = 0, totalIzin = 0, totalSakit = 0, totalAlpa = 0;
 
-                    const record = attendanceDb.find(a => a.userId === client.id && a.date === dateStr);
-                    const hasActivityOnDate = datesWithActivity.has(dateStr); 
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const dayDate = new Date(year, monthIndex, d);
+                      const dateStr = getLocalYYYYMMDD(dayDate);
+                      const dayOfWeek = dayDate.getDay();
+                      const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+                      const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+                      const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
+                      const isSpecialHoliday = holidaysDb.find(h => h.date === dateStr);
 
-                    if (record) {
-                      if (record.status === 'Hadir' || record.status === 'Terlambat') { row.push(record.status === 'Hadir' ? 'H' : 'T'); totalHadir++; }
-                      else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
-                      else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
-                      else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
-                      else { row.push(''); } 
-                    } else {
-                      if (isRoutineHoliday || isSpecialHoliday) row.push('L');
-                      else {
-                         if (dayDate <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
-                            if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('');
-                         } else row.push('');
+                      const record = attendanceDb.find(a => a.userId === client.id && a.date === dateStr);
+                      const hasActivityOnDate = datesWithActivity.has(dateStr); 
+
+                      if (record) {
+                        if (record.status === 'Hadir' || record.status === 'Terlambat') { row.push(record.status === 'Hadir' ? 'H' : 'T'); totalHadir++; }
+                        else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
+                        else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
+                        else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
+                        else { row.push(''); } 
+                      } else {
+                        if (isRoutineHoliday || isSpecialHoliday) row.push('L');
+                        else {
+                           if (dayDate <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
+                              if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('');
+                           } else row.push('');
+                        }
                       }
                     }
+                    row.push(totalHadir.toString(), totalIzin.toString(), totalSakit.toString(), totalAlpa.toString());
+                    body.push(row);
+                  });
+
+                  const pageWidth = doc.internal.pageSize.getWidth();
+                  const monthName = new Date(year, monthIndex).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                  
+                  let currentY = 14;
+
+                  if (settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '') {
+                    doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
+                    const splitKegiatan = doc.splitTextToSize(settingsDb.namaKegiatan.toUpperCase(), 200);
+                    doc.text(splitKegiatan, 8, currentY);
+                    currentY += (splitKegiatan.length * 5); 
                   }
-                  row.push(totalHadir.toString(), totalIzin.toString(), totalSakit.toString(), totalAlpa.toString());
-                  body.push(row);
-                });
 
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const monthName = new Date(year, monthIndex).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                
-                let currentY = 14;
-
-                if (settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '') {
                   doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
-                  const splitKegiatan = doc.splitTextToSize(settingsDb.namaKegiatan.toUpperCase(), 200);
-                  doc.text(splitKegiatan, 8, currentY);
-                  currentY += (splitKegiatan.length * 5); 
-                }
+                  const splitInstansi = doc.splitTextToSize((settingsDb.namaInstansi || '').toUpperCase(), 200);
+                  doc.text(splitInstansi, 8, currentY);
+                  currentY += (splitInstansi.length * 5) + 2; 
 
-                doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
-                const splitInstansi = doc.splitTextToSize((settingsDb.namaInstansi || '').toUpperCase(), 200);
-                doc.text(splitInstansi, 8, currentY);
-                currentY += (splitInstansi.length * 5) + 2; 
-
-                const addressParts = [settingsDb.alamat, settingsDb.desaKecamatan, settingsDb.kotaKabupaten, settingsDb.negara, settingsDb.kodePos].filter(Boolean).join(', ');
-                if (addressParts) {
-                  doc.setFontSize(8).setFont("helvetica", "normal").setTextColor(100, 100, 100);
-                  const splitAddress = doc.splitTextToSize(addressParts, 130); 
-                  doc.text(splitAddress, 8, currentY);
-                  currentY += (splitAddress.length * 4); 
-                }
-                const rightTextX = pageWidth - 28;
-                doc.setFontSize(12).setFont("helvetica", "bold").setTextColor(15, 23, 42).text("LAPORAN REKAPITULASI PRESENSI", rightTextX, 14, { align: 'right' });
-                doc.setFontSize(9).setFont("helvetica", "normal").setTextColor(71, 85, 105).text(`Periode: ${monthName}`, rightTextX, 19, { align: 'right' });
-                
-                const currentVerifMatch = verificationsDb.find(v => v.month === filterMonth);
-                const docId = currentVerifMatch ? currentVerifMatch.vid : `${year}${monthStr}-${Date.now().toString(16).substring(4).toUpperCase()}`;
-                doc.setFontSize(8).setFont("helvetica", "bold").setTextColor(100, 100, 100).text(`ID DOKUMEN: ${docId}`, rightTextX, 23, { align: 'right' });
-
-                const lineY = Math.max(29, currentY + 3); 
-                doc.setLineWidth(0.5).setDrawColor(226, 232, 240).line(8, lineY, pageWidth - 8, lineY);
-
-                doc.autoTable({
-                  startY: lineY + 4, margin: { left: 8, right: 8 }, head: head, body: body, theme: 'grid',
-                  styles: { fontSize: 7.5, halign: 'center', valign: 'middle', cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
-                  headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.1 },
-                  columnStyles: colStyles,
-                  didParseCell: function(data) {
-                     const isColumnDate = data.column.index > 1 && data.column.index <= daysInMonth + 1;
-                     let isHolidayCol = false;
-                     if (isColumnDate) {
-                        const dayDate = new Date(year, monthIndex, data.column.index - 1);
-                        const dateStr = getLocalYYYYMMDD(dayDate);
-                        const dayOfWeek = dayDate.getDay();
-                        const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-                        const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-                        isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
-                     }
-                     if (data.section === 'head') {
-                       data.cell.styles.fillColor = [255, 255, 255]; 
-                       data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
-                     }
-                     if (data.section === 'body') {
-                       if (data.column.index === 0 || data.column.index === 1) { 
-                          data.cell.styles.textColor = [15, 23, 42]; 
-                          data.cell.styles.fontStyle = 'bold'; 
-                          data.cell.styles.fontSize = 8.5; 
-                       }
-                       if (isColumnDate) {
-                         const val = data.cell.raw;
-                         if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                       } else if (data.column.index >= daysInMonth + 2) {
-                          if (data.column.index === daysInMonth + 2) data.cell.styles.textColor = [21, 128, 61]; 
-                          if (data.column.index === daysInMonth + 3) data.cell.styles.textColor = [147, 51, 234]; 
-                          if (data.column.index === daysInMonth + 4) data.cell.styles.textColor = [234, 179, 8]; 
-                          if (data.column.index === daysInMonth + 5) data.cell.styles.textColor = [220, 38, 38]; 
-                       }
-                     }
+                  const addressParts = [settingsDb.alamat, settingsDb.desaKecamatan, settingsDb.kotaKabupaten, settingsDb.negara, settingsDb.kodePos].filter(Boolean).join(', ');
+                  if (addressParts) {
+                    doc.setFontSize(8).setFont("helvetica", "normal").setTextColor(100, 100, 100);
+                    const splitAddress = doc.splitTextToSize(addressParts, 130); 
+                    doc.text(splitAddress, 8, currentY);
+                    currentY += (splitAddress.length * 4); 
                   }
-                });
+                  const rightTextX = pageWidth - 28;
+                  doc.setFontSize(12).setFont("helvetica", "bold").setTextColor(15, 23, 42).text("LAPORAN REKAPITULASI PRESENSI", rightTextX, 14, { align: 'right' });
+                  doc.setFontSize(9).setFont("helvetica", "normal").setTextColor(71, 85, 105).text(`Periode: ${monthName}`, rightTextX, 19, { align: 'right' });
+                  
+                  const currentVerifMatch = verificationsDb.find(v => v.month === filterMonth);
+                  const docId = currentVerifMatch ? currentVerifMatch.vid : `${year}${monthStr}-${Date.now().toString(16).substring(4).toUpperCase()}`;
+                  doc.setFontSize(8).setFont("helvetica", "bold").setTextColor(100, 100, 100).text(`ID DOKUMEN: ${docId}`, rightTextX, 23, { align: 'right' });
 
-                const finalY = doc.lastAutoTable.finalY || 28;
-                doc.setFontSize(8).setTextColor(100, 100, 100);
-                doc.text("Keterangan: H (Hadir), T (Terlambat), I (Izin), S (Sakit), A (Alpa/Tidak Hadir), L (Libur)", 14, finalY + 6);
+                  const lineY = Math.max(29, currentY + 3); 
+                  doc.setLineWidth(0.5).setDrawColor(226, 232, 240).line(8, lineY, pageWidth - 8, lineY);
 
-                doc.setFontSize(10).setTextColor(0, 0, 0);
-                let signatureY = finalY + 35; 
-                
-                let pjs = [];
-                try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
-                if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: '...................................', nip: 'NIP/NIM.'}];
+                  doc.autoTable({
+                    startY: lineY + 4, margin: { left: 8, right: 8 }, head: head, body: body, theme: 'grid',
+                    styles: { fontSize: 7.5, halign: 'center', valign: 'middle', cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
+                    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.1 },
+                    columnStyles: colStyles,
+                    didParseCell: function(data) {
+                       const isColumnDate = data.column.index > 1 && data.column.index <= daysInMonth + 1;
+                       let isHolidayCol = false;
+                       if (isColumnDate) {
+                          const dayDate = new Date(year, monthIndex, data.column.index - 1);
+                          const dateStr = getLocalYYYYMMDD(dayDate);
+                          const dayOfWeek = dayDate.getDay();
+                          const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+                          const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+                          isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
+                       }
+                       if (data.section === 'head') {
+                         data.cell.styles.fillColor = [255, 255, 255]; 
+                         data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
+                       }
+                       if (data.section === 'body') {
+                         if (data.column.index === 0 || data.column.index === 1) { 
+                            data.cell.styles.textColor = [15, 23, 42]; 
+                            data.cell.styles.fontStyle = 'bold'; 
+                            data.cell.styles.fontSize = 8.5; 
+                         }
+                         if (isColumnDate) {
+                           const val = data.cell.raw;
+                           if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
+                           else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
+                           else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
+                           else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
+                           else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+                           else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+                         } else if (data.column.index >= daysInMonth + 2) {
+                            if (data.column.index === daysInMonth + 2) data.cell.styles.textColor = [21, 128, 61]; 
+                            if (data.column.index === daysInMonth + 3) data.cell.styles.textColor = [147, 51, 234]; 
+                            if (data.column.index === daysInMonth + 4) data.cell.styles.textColor = [234, 179, 8]; 
+                            if (data.column.index === daysInMonth + 5) data.cell.styles.textColor = [220, 38, 38]; 
+                         }
+                       }
+                    }
+                  });
 
-                const nPjs = pjs.length;
-                const totalRows = Math.ceil(nPjs / 2);
-                const colLeftX = pageWidth * 0.25;
-                const colRightX = pageWidth * 0.75;
-                const colCenterX = pageWidth * 0.5;
+                  const finalY = doc.lastAutoTable.finalY || 28;
+                  doc.setFontSize(8).setTextColor(100, 100, 100);
+                  doc.text("Keterangan: H (Hadir), T (Terlambat), I (Izin), S (Sakit), A (Alpa/Tidak Hadir), L (Libur)", 14, finalY + 6);
 
-                const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
-                const locationDateText = city ? `${city}, ${date}` : date;
-                // PERBAIKAN SINTAKS UTAMA: Mengembalikan mainstayX => {} menjadi mengetahuiX agar valid dikompilasi
-                doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
-                doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
+                  doc.setFontSize(10).setTextColor(0, 0, 0);
+                  let signatureY = finalY + 35; 
+                  
+                  let pjs = [];
+                  try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
+                  if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: '...................................', nip: 'NIP/NIM.'}];
 
-                pjs.forEach((pj, idx) => {
-                   let row, colX;
-                   if (nPjs % 2 !== 0) { 
-                      if (idx === 0) {
-                         row = totalRows - 1; 
-                         colX = colCenterX;   
-                      } else {
-                         let pairIndex = Math.ceil(idx / 2);
-                         row = totalRows - 1 - pairIndex;                
-                         colX = (idx % 2 === 1) ? colRightX : colLeftX; 
-                      }
-                   } else { 
-                      let pairIndex = Math.floor(idx / 2);
-                      row = totalRows - 1 - pairIndex;               
-                      colX = (idx % 2 === 0) ? colRightX : colLeftX; 
-                   }
+                  const nPjs = pjs.length;
+                  const totalRows = Math.ceil(nPjs / 2);
+                  const colLeftX = pageWidth * 0.25;
+                  const colRightX = pageWidth * 0.75;
+                  const colCenterX = pageWidth * 0.5;
 
-                   const currentY = signatureY + (row * 35);
-                   doc.setFont("helvetica", "normal").text(pj.jabatan || "...................................", colX, currentY, { align: "center" });
-                   doc.setFont("helvetica", "bold").text(pj.nama || "...................................", colX, currentY + 20, { align: "center" });
-                   doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
-                });
+                  const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
+                  const locationDateText = city ? `${city}, ${date}` : date;
+                  doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
+                  doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
 
-                const savePDF = () => {
-                   doc.save(`Rekap_Presensi_${monthName.replace(' ', '_')}.pdf`);
-                   Swal.close();
-                };
+                  pjs.forEach((pj, idx) => {
+                     let row, colX;
+                     if (nPjs % 2 !== 0) { 
+                        if (idx === 0) {
+                           row = totalRows - 1; 
+                           colX = colCenterX;   
+                        } else {
+                           let pairIndex = Math.ceil(idx / 2);
+                           row = totalRows - 1 - pairIndex;                
+                           colX = (idx % 2 === 1) ? colRightX : colLeftX; 
+                        }
+                     } else { 
+                        let pairIndex = Math.floor(idx / 2);
+                        row = totalRows - 1 - pairIndex;               
+                        colX = (idx % 2 === 0) ? colRightX : colLeftX; 
+                     }
 
-                if (qrUrlParam) {
-                   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=${encodeURIComponent(qrUrlParam)}`;
-                   const img = new Image();
-                   img.crossOrigin = "Anonymous";
-                   img.onload = () => {
-                       const canvas = document.createElement('canvas');
-                       canvas.width = img.width; canvas.height = img.height;
-                       const ctx = canvas.getContext('2d');
-                       ctx.drawImage(img, 0, 0);
-                       const dataURL = canvas.toDataURL('image/png');
-                       doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
-                       savePDF();
-                   };
-                   img.onerror = () => savePDF();
-                   img.src = qrUrl;
-                } else {
-                   savePDF(); 
+                     const currentY = signatureY + (row * 35);
+                     doc.setFont("helvetica", "normal").text(pj.jabatan || "...................................", colX, currentY, { align: "center" });
+                     doc.setFont("helvetica", "bold").text(pj.nama || "...................................", colX, currentY + 20, { align: "center" });
+                     doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
+                  });
+
+                  const savePDF = () => {
+                     doc.save("Rekap_Presensi_" + filterMonth + ".pdf");
+                     Swal.close();
+                  };
+
+                  if (qrUrlParam) {
+                     const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(qrUrlParam);
+                     const img = new Image();
+                     img.crossOrigin = "Anonymous";
+                     img.onload = () => {
+                         const canvas = document.createElement('canvas');
+                         canvas.width = img.width; canvas.height = img.height;
+                         const ctx = canvas.getContext('2d');
+                         ctx.drawImage(img, 0, 0);
+                         const dataURL = canvas.toDataURL('image/png');
+                         doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
+                         savePDF();
+                     };
+                     img.onerror = () => savePDF();
+                     img.src = qrUrl;
+                  } else {
+                     savePDF(); 
+                  }
+                } catch (error) {
+                  console.error(error);
+                  Swal.fire('Error', 'Gagal memproses file PDF.', 'error');
                 }
-              } catch (error) {
-                console.error(error);
-                Swal.fire('Error', 'Gagal memproses file PDF.', 'error');
-              }
-            }, 100);
-          }
-        });
+              }, 100);
+            }
+          });
+        };
+
+        const currentVerif = verificationsDb.find(v => v.month === filterMonth);
+        if (!currentVerif) {
+           proceedToPopup(null);
+        } else {
+           proceedToPopup(currentVerif.url);
+        }
       };
 
       const handleLogout = () => {
@@ -1056,11 +1069,63 @@
         Swal.fire({
           title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan!", icon: 'warning',
           showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        }).then(async (result) => {
+        }).then((result) => {
           if (result.isConfirmed) {
-            await window.fs.deleteDoc(window.fs.doc(window.db, "users", id.toString()));
+            window.fs.deleteDoc(window.fs.doc(window.db, "users", id.toString()));
             setUsersDb(prev => prev.filter(u => u.id !== id));
             Swal.fire({ icon: 'success', title: 'Terhapus!', text: 'Data client telah dihapus.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          }
+        });
+      };
+
+      const handleEditAttendance = (record) => {
+        Swal.fire({
+          title: '<h2 class="text-xl font-bold text-slate-800">Update Presensi</h2>',
+          html: `
+            <div class="text-left mt-2 space-y-3">
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status Kehadiran</label>
+                <select id="swal-s" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm">
+                  <option value="Hadir" ${record.status === 'Hadir' ? 'selected' : ''}>Hadir</option>
+                  <option value="Terlambat" ${record.status === 'Terlambat' ? 'selected' : ''}>Terlambat</option>
+                  <option value="Izin" ${record.status === 'Izin' ? 'selected' : ''}>Izin</option>
+                  <option value="Sakit" ${record.status === 'Sakit' ? 'selected' : ''}>Sakit</option>
+                  <option value="Alpa" ${record.status === 'Alpa' ? 'selected' : ''}>Alpa</option>
+                  <option value="Menunggu" ${record.status === 'Menunggu' ? 'selected' : ''}>Menunggu (Kosong)</option>
+                </select>
+              </div>
+              <div class="flex gap-3">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 w-1/2">
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Jam Masuk</label>
+                  <input type="time" id="swal-in" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${formatTimeForInput(record.timeIn)}">
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 w-1/2">
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Jam Pulang</label>
+                  <input type="time" id="swal-out" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${formatTimeForInput(record.timeOut)}">
+                </div>
+              </div>
+            </div>
+          `,
+          showCancelButton: true, confirmButtonText: 'Update Data', cancelButtonText: 'Batal', buttonsStyling: false,
+          customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-md', confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2 mt-4', cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all', actions: 'flex flex-col w-full p-0' },
+          preConfirm: () => { return { ...record, status: document.getElementById('swal-s').value, timeIn: document.getElementById('swal-in').value, timeOut: document.getElementById('swal-out').value } }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            await window.fs.setDoc(window.fs.doc(window.db, "attendance", result.value.id.toString()), result.value);
+            setAttendanceDb(prev => prev.map(a => a.id === record.id ? result.value : a));
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Riwayat presensi diperbarui.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          }
+        });
+      };
+
+      const handleDeleteAttendance = (id) => {
+        Swal.fire({
+          title: 'Hapus Presensi?', text: "Data tidak dapat dikembalikan!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            await window.fs.deleteDoc(window.fs.doc(window.db, "attendance", id.toString()));
+            setAttendanceDb(prev => prev.filter(a => a.id !== id));
+            Swal.fire({ icon: 'success', title: 'Terhapus!', text: 'Riwayat presensi dihapus.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
         });
       };
@@ -1084,6 +1149,52 @@
           };
         });
       }, [usersDb, attendanceDb, todayStr]);
+
+      const monthlyClientSummaries = useMemo(() => {
+        const [yearStr, monthStr] = filterMonth.split('-');
+        const year = parseInt(yearStr);
+        const monthIndex = parseInt(monthStr) - 1;
+        const totalDaysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        
+        const activeDatesInMonth = new Set(attendanceDb.filter(a => a.date.startsWith(filterMonth)).map(a => a.date));
+
+        return usersDb.filter(u => u.role === 'client').map(client => {
+          let countHadir = 0, countIzin = 0, countSakit = 0, countAlpa = 0;
+          const recordsThisMonth = attendanceDb.filter(a => a.userId === client.id && a.date.startsWith(filterMonth));
+
+          for (let d = 1; d <= totalDaysInMonth; d++) {
+            const loopDateObj = new Date(year, monthIndex, d);
+            const dateStr = getLocalYYYYMMDD(loopDateObj);
+            const dayOfWeek = loopDateObj.getDay();
+
+            const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+            const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+            const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
+            const isSpecialHoliday = holidaysDb.some(h => h.date === dateStr);
+
+            const matchRecord = recordsThisMonth.find(r => r.date === dateStr);
+
+            if (matchRecord) {
+              if (['Hadir', 'Terlambat'].includes(matchRecord.status)) countHadir++;
+              else if (matchRecord.status === 'Izin') countIzin++;
+              else if (matchRecord.status === 'Sakit') countSakit++;
+              else if (matchRecord.status === 'Alpa') countAlpa++;
+            } else {
+              if (!isRoutineHoliday && !isSpecialHoliday && loopDateObj <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
+                if (activeDatesInMonth.has(dateStr)) countAlpa++;
+              }
+            }
+          }
+
+          return {
+            ...client,
+            hadir: countHadir,
+            izin: countIzin,
+            sakit: countSakit,
+            alpa: countAlpa
+          };
+        });
+      }, [usersDb, attendanceDb, holidaysDb, settingsDb, filterMonth, currentTime]);
 
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
@@ -1386,6 +1497,48 @@
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Terlambat</p>
                     <h3 className="text-3xl font-black text-slate-800">{attendanceDb.filter(a => a.date === todayStr && a.status === 'Terlambat').length}</h3>
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-chart-bar mr-2 text-blue-600"></i>Ringkasan Akumulasi Kehadiran Bulanan</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran mandiri personil client pada periode aktif: <b class="text-blue-600">${filterMonth}</b></p>
+                  </div>
+                  <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-wider tabular-nums">Total Rekap</span>
+                </div>
+                <div className="overflow-x-auto p-2">
+                  <table className="w-full text-left border-collapse min-w-[500px]">
+                    <thead>
+                      <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
+                        <th className="px-4 py-3 font-bold">Nama Lengkap</th>
+                        <th className="px-4 py-3 font-bold">NIM</th>
+                        <th className="px-4 py-3 font-bold text-center text-green-600">Hadir</th>
+                        <th className="px-4 py-3 font-bold text-center text-purple-600">Izin</th>
+                        <th className="px-4 py-3 font-bold text-center text-yellow-600">Sakit</th>
+                        <th className="px-4 py-3 font-bold text-center text-red-600">Alpa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 text-slate-700">
+                      {monthlyClientSummaries.map(c => (
+                        <tr key={c.id} className="hover:bg-slate-50/80 transition-colors font-medium">
+                          <td className="px-4 py-3 font-bold text-slate-800 flex items-center space-x-3">
+                            <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs uppercase">{c.name.charAt(0)}</div>
+                            <span>{c.name}</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 font-mono text-xs">{c.nim || '-'}</td>
+                          <td className="px-4 py-3 text-center tabular-nums text-green-600 font-bold bg-green-50/20">{c.hadir}</td>
+                          <td className="px-4 py-3 text-center tabular-nums text-purple-600 font-bold bg-purple-50/20">{c.izin}</td>
+                          <td className="px-4 py-3 text-center tabular-nums text-yellow-600 font-bold bg-yellow-50/20">{c.sakit}</td>
+                          <td className="px-4 py-3 text-center tabular-nums text-red-600 font-bold bg-red-50/20">{c.alpa}</td>
+                        </tr>
+                      ))}
+                      {monthlyClientSummaries.length === 0 && (
+                        <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-medium italic"><i className="fas fa-folder-open text-xl mb-1.5 block opacity-40"></i>Belum ada data client terdaftar.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
