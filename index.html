@@ -914,6 +914,7 @@
 
                 const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
                 const locationDateText = city ? `${city}, ${date}` : date;
+                // PERBAIKAN SINTAKS UTAMA: Mengembalikan mainstayX => {} menjadi mengetahuiX agar valid dikompilasi
                 doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
                 doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
 
@@ -1064,73 +1065,6 @@
         });
       };
 
-      const handleEditAttendance = (record) => {
-        Swal.fire({
-          title: '<h2 class="text-xl font-bold text-slate-800">Update Presensi</h2>',
-          html: `
-            <div class="text-left mt-2 space-y-3">
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status Kehadiran</label>
-                <select id="swal-s" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm">
-                  <option value="Hadir" ${record.status === 'Hadir' ? 'selected' : ''}>Hadir</option>
-                  <option value="Terlambat" ${record.status === 'Terlambat' ? 'selected' : ''}>Terlambat</option>
-                  <option value="Izin" ${record.status === 'Izin' ? 'selected' : ''}>Izin</option>
-                  <option value="Sakit" ${record.status === 'Sakit' ? 'selected' : ''}>Sakit</option>
-                  <option value="Alpa" ${record.status === 'Alpa' ? 'selected' : ''}>Alpa</option>
-                  <option value="Menunggu" ${record.status === 'Menunggu' ? 'selected' : ''}>Menunggu (Kosong)</option>
-                </select>
-              </div>
-              <div class="flex gap-3">
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 w-1/2">
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Jam Masuk</label>
-                  <input type="time" id="swal-in" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${formatTimeForInput(record.timeIn)}">
-                </div>
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 w-1/2">
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Jam Pulang</label>
-                  <input type="time" id="swal-out" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm" value="${formatTimeForInput(record.timeOut)}">
-                </div>
-              </div>
-            </div>
-          `,
-          showCancelButton: true, confirmButtonText: 'Update Data', cancelButtonText: 'Batal', buttonsStyling: false,
-          customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-md', confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2 mt-4', cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all', actions: 'flex flex-col w-full p-0' },
-          preConfirm: () => { return { ...record, status: document.getElementById('swal-s').value, timeIn: document.getElementById('swal-in').value, timeOut: document.getElementById('swal-out').value } }
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            await window.fs.setDoc(window.fs.doc(window.db, "attendance", result.value.id.toString()), result.value);
-            setAttendanceDb(prev => prev.map(a => a.id === record.id ? result.value : a));
-            Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Riwayat presensi diperbarui.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
-          }
-        });
-      };
-
-      const handleDeleteAttendance = (id) => {
-        Swal.fire({
-          title: 'Hapus Presensi?', text: "Data tidak dapat dikembalikan!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        }).then((result) => {
-          if (result.isConfirmed) {
-            window.fs.deleteDoc(window.fs.doc(window.db, "attendance", id.toString()));
-            setAttendanceDb(prev => prev.filter(a => a.id !== id));
-            Swal.fire({ icon: 'success', title: 'Terhapus!', text: 'Riwayat presensi dihapus.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
-          }
-        });
-      };
-
-      const ensureAllClientsHaveRecord = async (todayStr, skipUserId) => {
-          const clients = usersDb.filter(u => u.role === 'client');
-          let additions = [];
-          for (const client of clients) {
-              if (client.id === skipUserId) continue;
-              const hasRec = attendanceDb.some(a => a.userId === client.id && a.date === todayStr) || additions.some(a => a.userId === client.id);
-              if (!hasRec) {
-                  const pRec = { id: Date.now() + client.id, userId: client.id, date: todayStr, timeIn: '-', timeOut: '-', status: 'Menunggu' };
-                  additions.push(pRec);
-                  window.fs.setDoc(window.fs.doc(window.db, "attendance", pRec.id.toString()), pRec).catch(e => console.error(e));
-              }
-          }
-          return additions;
-      };
-
       const todayStr = getLocalYYYYMMDD(currentTime);
       const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === todayStr);
       const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
@@ -1139,7 +1073,6 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // Pemantauan List Hari Ini
       const todayAttendanceList = useMemo(() => {
         return usersDb.filter(u => u.role === 'client').map(client => {
           const record = attendanceDb.find(a => a.userId === client.id && a.date === todayStr);
@@ -1152,57 +1085,6 @@
         });
       }, [usersDb, attendanceDb, todayStr]);
 
-      // TAMBAHAN BARU: Hitung total bulanan dinamis (Hadir, Izin, Sakit, Alpa) per client untuk ditaruh di Dashboard Admin
-      const monthlyClientSummaries = useMemo(() => {
-        const [yearStr, monthStr] = filterMonth.split('-');
-        const year = parseInt(yearStr);
-        const monthIndex = parseInt(monthStr) - 1;
-        const totalDaysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-        
-        // Cari tanggal mana saja di bulan aktif yang punya aktivitas data di Firestore
-        const activeDatesInMonth = new Set(attendanceDb.filter(a => a.date.startsWith(filterMonth)).map(a => a.date));
-
-        return usersDb.filter(u => u.role === 'client').map(client => {
-          let countHadir = 0, countIzin = 0, countSakit = 0, countAlpa = 0;
-          const recordsThisMonth = attendanceDb.filter(a => a.userId === client.id && a.date.startsWith(filterMonth));
-
-          // Looping tanggal 1 s/d tanggal terakhir bulan tersebut
-          for (let d = 1; d <= totalDaysInMonth; d++) {
-            const loopDateObj = new Date(year, monthIndex, d);
-            const dateStr = getLocalYYYYMMDD(loopDateObj);
-            const dayOfWeek = loopDateObj.getDay();
-
-            // Aturan penentu libur rutin
-            const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-            const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-            const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
-            const isSpecialHoliday = holidaysDb.some(h => h.date === dateStr);
-
-            const matchRecord = recordsThisMonth.find(r => r.date === dateStr);
-
-            if (matchRecord) {
-              if (['Hadir', 'Terlambat'].includes(matchRecord.status)) countHadir++;
-              else if (matchRecord.status === 'Izin') countIzin++;
-              else if (matchRecord.status === 'Sakit') countSakit++;
-              else if (matchRecord.status === 'Alpa') countAlpa++;
-            } else {
-              // Jika data kosong, cek apakah hari itu lewat masa/hari ini dan pangkalan data instansi punya riwayat aktif
-              if (!isRoutineHoliday && !isSpecialHoliday && loopDateObj <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
-                if (activeDatesInMonth.has(dateStr)) countAlpa++;
-              }
-            }
-          }
-
-          return {
-            ...client,
-            hadir: countHadir,
-            izin: countIzin,
-            sakit: countSakit,
-            alpa: countAlpa
-          };
-        });
-      }, [usersDb, attendanceDb, holidaysDb, settingsDb, filterMonth, currentTime]);
-
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 relative z-10">
@@ -1211,7 +1093,7 @@
                 <i className="fas fa-shield-alt text-white text-2xl"></i>
               </div>
               <h1 className="text-xl font-bold text-slate-800 tracking-tight">Pendaftaran Admin Utama</h1>
-              <p className="text-slate-400 mt-1 text-xs font-semibold">Sistem baru terdetectsi. Silakan daftarkan akun Admin Utama Anda.</p>
+              <p className="text-slate-400 mt-1 text-xs font-semibold">Sistem baru terdeteksi. Silakan daftarkan akun Admin Utama Anda.</p>
             </div>
             <form onSubmit={handleRegisterAdmin} className="space-y-4">
               <div>
@@ -1504,49 +1386,6 @@
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Terlambat</p>
                     <h3 className="text-3xl font-black text-slate-800">{attendanceDb.filter(a => a.date === todayStr && a.status === 'Terlambat').length}</h3>
                   </div>
-                </div>
-              </div>
-
-              <!-- BARU: Tabel Rekapan Akumulasi Bulanan Setiap Client (Hadir, Izin, Sakit, Alpa) -->
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-chart-bar mr-2 text-blue-600"></i>Ringkasan Akumulasi Kehadiran Bulanan</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran mandiri personil client pada periode aktif: <b class="text-blue-600">${filterMonth}</b></p>
-                  </div>
-                  <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-wider tabular-nums">Total Rekap</span>
-                </div>
-                <div className="overflow-x-auto p-2">
-                  <table className="w-full text-left border-collapse min-w-[500px]">
-                    <thead>
-                      <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
-                        <th className="px-4 py-3 font-bold">Nama Lengkap</th>
-                        <th className="px-4 py-3 font-bold">NIM</th>
-                        <th className="px-4 py-3 font-bold text-center text-green-600">Hadir</th>
-                        <th className="px-4 py-3 font-bold text-center text-purple-600">Izin</th>
-                        <th className="px-4 py-3 font-bold text-center text-yellow-600">Sakit</th>
-                        <th className="px-4 py-3 font-bold text-center text-red-600">Alpa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 text-slate-700">
-                      {monthlyClientSummaries.map(c => (
-                        <tr key={c.id} className="hover:bg-slate-50/80 transition-colors font-medium">
-                          <td className="px-4 py-3 font-bold text-slate-800 flex items-center space-x-3">
-                            <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs uppercase">{c.name.charAt(0)}</div>
-                            <span>{c.name}</span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 font-mono text-xs">{c.nim || '-'}</td>
-                          <td className="px-4 py-3 text-center tabular-nums text-green-600 font-bold bg-green-50/20">{c.hadir}</td>
-                          <td className="px-4 py-3 text-center tabular-nums text-purple-600 font-bold bg-purple-50/20">{c.izin}</td>
-                          <td className="px-4 py-3 text-center tabular-nums text-yellow-600 font-bold bg-yellow-50/20">{c.sakit}</td>
-                          <td className="px-4 py-3 text-center tabular-nums text-red-600 font-bold bg-red-50/20">{c.alpa}</td>
-                        </tr>
-                      ))}
-                      {monthlyClientSummaries.length === 0 && (
-                        <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-medium italic"><i className="fas fa-folder-open text-xl mb-1.5 block opacity-40"></i>Belum ada data client terdaftar.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
                 </div>
               </div>
 
