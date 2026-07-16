@@ -515,17 +515,15 @@
         }
       };
 
-      // FITUR BARU: Handler untuk Menambah Presensi Massal Admin Secara Fleksibel
+      // PERBAIKAN: Perbaikan parsing variabel perulangan dropdown and eksekusi bulk data
       const handleAddBulkAttendance = () => {
         const [yearStr, monthStr] = filterMonth.split('-');
         const y = parseInt(yearStr);
         const mIdx = parseInt(monthStr) - 1;
         const totalDays = new Date(y, mIdx + 1, 0).getDate();
 
-        // 1. Kumpulkan semua tanggal yang sudah memiliki rekaman aktivitas siswa
         const existingDates = new Set(attendanceDb.filter(a => a.date.startsWith(filterMonth)).map(a => a.date));
         
-        // 2. Buat daftar tanggal yang belum terisi di bulan tersebut
         let availableDates = [];
         for (let d = 1; d <= totalDays; d++) {
           const dateObj = new Date(y, mIdx, d);
@@ -542,7 +540,6 @@
           return Swal.fire({ icon: 'info', title: 'Pemberitahuan', text: 'Semua tanggal pada bulan ini sudah memiliki data presensi.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
         }
 
-        // 3. Tampilkan popup pilihan tanggal eksklusif yang belum ada datanya
         Swal.fire({
           title: '<h2 class="text-lg font-bold text-slate-800">Tambah Presensi Massal</h2>',
           html: `
@@ -550,7 +547,7 @@
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Pilih Tanggal Kehadiran</label>
                 <select id="bulk-date-select" class="w-full bg-transparent outline-none font-bold text-slate-700 text-sm">
-                  ${availableDates.map(d => `<option value="${data.value}">${d.label}</option>`).join('')}
+                  ${availableDates.map(d => `<option value="${d.value}">${d.label}</option>`).join('')}
                 </select>
               </div>
               <p class="text-[10px] text-slate-400 font-semibold mt-2 px-1 leading-relaxed">
@@ -575,13 +572,12 @@
             }
 
             Swal.fire({
-              html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyimpan Kehadiran Massal...</p></div>',
+              html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan Rekaman Data...</p></div>',
               allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }
             });
 
             try {
               let newRecords = [];
-              // Gabungkan format titik kustom instansi atau gunakan format default
               const timeInDefault = settingsDb.jamMasuk || "08:00";
               const timeOutDefault = settingsDb.jamPulang || "17:00";
 
@@ -601,7 +597,7 @@
               }
 
               setAttendanceDb(prev => [...prev, ...newRecords]);
-              Swal.fire({ icon: 'success', title: 'Berhasil', text: `Presensi massal berhasil ditambahkan pada tanggal ${selectedDate}`, timer: 1800, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+              Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Presensi massal sukses ditambahkan.', timer: 1800, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
             } catch (err) {
               console.error(err);
               Swal.fire('Error', 'Gagal memproses data kehadiran massal.', 'error');
@@ -817,7 +813,7 @@
         };
 
         if (String(settingsDb.useLocation).toLowerCase() === 'true') {
-          if (!settingsDb.lokasi || settingsDb.lokasi.includes('Memuat')) return Swal.fire({title: 'Error Konfigurasi', text:'Lokasi kantor belum diset.', icon:'warning', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+          if (!settingsDb.lokasi || settingsDb.lokasi.includes('Memuat')) return Swal.fire({title: 'Error Konfigurasi', text:'Locations kantor belum diset.', icon:'warning', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
           setIsLocating(true);
           navigator.geolocation.getCurrentPosition(pos => {
             const off = settingsDb.lokasi.split(',');
@@ -1166,33 +1162,6 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // GUARD SCREEN 1: BILA DATABASE KOSONG, TAMPILKAN REGISTER UTAMA
-      if (isSystemEmpty) return (
-        <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
-          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 relative z-10">
-            <div className="text-center mb-6">
-              <div className="bg-emerald-600 w-16 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-100">
-                <i className="fas fa-shield-alt text-white text-2xl"></i>
-              </div>
-              <h1 className="text-xl font-bold text-slate-800 tracking-tight">Pendaftaran Admin Utama</h1>
-              <p className="text-slate-400 mt-1 text-xs font-semibold">Sistem baru terdeteksi. Silakan daftarkan akun Admin Utama Anda.</p>
-            </div>
-            <form onSubmit={handleRegisterAdmin} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">Nama Lengkap Admin</label>
-                <input type="text" required value={regForm.name} onChange={e=>setRegForm({...regForm, name:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-700 text-sm" placeholder="Contoh: Fahmi Professional" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">Username Login Admin</label>
-                <input type="text" required value={regForm.username} onChange={e=>setRegForm({...regForm, username:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 text-sm" placeholder="Contoh: masteradmin" />
-              </div>
-              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm mt-4">Daftar & Amankan Sistem</button>
-            </form>
-          </div>
-        </div>
-      );
-
-      // GUARD SCREEN 2: LOGIN SCREEN
       if (!user) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
@@ -1214,7 +1183,6 @@
         </div>
       );
 
-      // GUARD SCREEN 3: LOADING SYNCING DASHBOARD
       if (!isDataReady) return (
         <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
           <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
@@ -1591,12 +1559,13 @@
                           className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all h-[38px]" 
                         />
 
-                        {/* FITUR BARU: Tombol Tambah Presensi Massal Khusus Admin */}
+                        {/* REVISI: Mengubah tombol menjadi hanya ikon komparatif logo biru minimalis */}
                         <button 
                           onClick={handleAddBulkAttendance}
-                          className="bg-blue-600 hover:bg-blue-700 border border-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center shadow-sm h-[38px]"
+                          className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px]"
+                          title="Tambah Presensi Massal"
                         >
-                          <i className="fas fa-calendar-plus mr-2"></i><span>Tambah Presensi</span>
+                          <i className="fas fa-calendar-plus text-lg"></i>
                         </button>
                         
                         {hasData && currentVerif && (
