@@ -109,14 +109,12 @@
 
       const changeMonth = (offset) => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
 
-      // PERBAIKAN: Fungsi manajemen list libur real-time DOM tanpa close/blink popup
       const handleDateClick = async (date) => {
         if (userRole !== 'admin') return;
         if (!date) return;
         const dateStr = getLocalYYYYMMDD(date);
         const formattedDateTitle = date.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
 
-        // Fungsi internal untuk render ulang inner HTML list libur di dalam Swal tanpa menutup modal
         const updateSwalListDOM = (currentHolidays) => {
           const listContainer = document.getElementById('swal-holiday-list-container');
           if (!listContainer) return;
@@ -133,7 +131,6 @@
               </div>
             `).join('');
           }
-          // Update teks counter label
           const labelCounter = document.getElementById('swal-holiday-counter-label');
           if (labelCounter) labelCounter.innerText = `Acara Aktif (${currentHolidays.length})`;
         };
@@ -145,7 +142,6 @@
               <div class="space-y-2">
                 <label id="swal-holiday-counter-label" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">Acara Aktif (0)</label>
                 <div id="swal-holiday-list-container" class="space-y-2">
-                  <!-- Diisi dinamis via didOpen -->
                 </div>
               </div>
               <hr class="border-slate-100" />
@@ -169,14 +165,12 @@
             cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all text-sm mt-2'
           },
           didOpen: () => {
-            // Ambil snapshot awal libur khusus di tanggal ini
             let currentLocalHolidays = [...window.getLatestHolidaysByDate(dateStr)];
             updateSwalListDOM(currentLocalHolidays);
 
-            // Handler Hapus Item tanpa kedip / tutup modal
             window.deleteHolidayEvent = async (id) => {
               const targetDOM = document.getElementById(`holiday-item-${id}`);
-              if (targetDOM) targetDOM.style.opacity = "0.4"; // Efek visual loading hapus
+              if (targetDOM) targetDOM.style.opacity = "0.4"; 
 
               try {
                 await window.fs.deleteDoc(window.fs.doc(window.db, "holidays", id.toString()));
@@ -192,7 +186,6 @@
               }
             };
 
-            // Handler Tambah Item tanpa kedip / tutup modal
             window.addHolidayEvent = async (targetDate) => {
               const inputField = document.getElementById('swal-new-holiday');
               const val = inputField ? inputField.value.trim() : "";
@@ -224,7 +217,6 @@
         });
       };
 
-      // Helper bypass temporary state untuk sinkronisasi closure didOpen Swal
       useEffect(() => {
         window.getLatestHolidaysByDate = (dStr) => holidaysDb.filter(h => h.date === dStr);
         return () => { delete window.getLatestHolidaysByDate; };
@@ -993,7 +985,8 @@
                    Swal.close();
                 };
 
-                if (qrUrlParam) {
+                const qrUrlParam = settingsDb.appScriptUrl;
+                if (qrUrlParam && qrUrlParam.trim() !== "") {
                    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(qrUrlParam);
                    const img = new Image();
                    img.crossOrigin = "Anonymous";
@@ -1553,8 +1546,7 @@
                 <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-chart-bar mr-2 text-blue-600"></i>Ringkasan Akumulasi Kehadiran Bulanan</h3>
-                    {/* PERBAIKAN: Membungkus sintaks filterMonth di dalam kurung kurawal React `{}` agar tidak eror compile */}
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran mandiri personil client pada periode aktif: <b class="text-blue-600">{filterMonth}</b></p>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran mandiri personil client pada periode aktif: <b className="text-blue-600">{filterMonth}</b></p>
                   </div>
                   <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-wider tabular-nums">Total Rekap</span>
                 </div>
@@ -1595,7 +1587,6 @@
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
-                    {/* PERBAIKAN: Mengganti teks Siswa menjadi Client */}
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-clipboard-list mr-2 text-blue-600"></i>Status Pemantauan Client Hari Ini</h3>
                     <p className="text-xs text-slate-400 font-medium mt-0.5">Daftar rekapan real-time seluruh personil client per tanggal {currentTime.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
                   </div>
@@ -1812,7 +1803,7 @@
                        </div>
                        <div>
                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Kota / Kabupaten</label>
-                         <input type="text" value={settingsDb.alamat || ''} onChange={e=>setSettingsDb({...settingsDb, kotaKabupaten: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jember"/>
+                         <input type="text" value={settingsDb.kotaKabupaten || ''} onChange={e=>setSettingsDb({...settingsDb, kotaKabupaten: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jember"/>
                        </div>
                        <div>
                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Provinsi / Negara</label>
@@ -1869,13 +1860,11 @@
             </div>
           )}
         </div>
-      </main>
-    </div>
-  );
-}
+      );
+    }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
-</script>
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
 </body>
 </html>
