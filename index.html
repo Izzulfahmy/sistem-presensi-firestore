@@ -717,302 +717,30 @@
 
                 const colStyles = { 0: { halign: 'center', cellWidth: 8 }, 1: { halign: 'left' } };
                 for (let i = 1; i <= daysInMonth; i++) colStyles[i + 1] = { halign: 'center', cellWidth: 7.2 }; 
-                colStyles[daysInMonth + 2] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
-                colStyles[daysInMonth + 3] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };
-                colStyles[daysInMonth + 4] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' }; 
-                colStyles[daysInMonth + 5] = { halign: 'center', cellWidth: 7, fontStyle: 'bold' };  
-
-                const body = [];
-                const clients = usersDb.filter(u => u.role === 'client');
-
-                clients.forEach((client, index) => {
-                  const clientNameNim = client.name + '\n' + (client.nim || '-');
-                  const row = [index + 1, clientNameNim];
-                  let totalHadir = 0, totalIzin = 0, totalSakit = 0, totalAlpa = 0;
-
-                  for (let d = 1; d <= daysInMonth; d++) {
-                    const dayDate = new Date(year, monthIndex, d);
-                    const dateStr = getLocalYYYYMMDD(dayDate);
-                    const dayOfWeek = dayDate.getDay();
-                    const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-                    const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-                    const isRoutineHoliday = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu);
-                    const isSpecialHoliday = holidaysDb.find(h => h.date === dateStr);
-
-                    const record = attendanceDb.find(a => a.userId === client.id && a.date === dateStr);
-                    const hasActivityOnDate = datesWithActivity.has(dateStr); 
-
-                    if (record) {
-                      if (record.status === 'Hadir' || record.status === 'Terlambat') { row.push(record.status === 'Hadir' ? 'H' : 'T'); totalHadir++; }
-                      else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
-                      else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
-                      else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
-                      else { row.push(''); } 
-                    } else {
-                      if (isRoutineHoliday || isSpecialHoliday) row.push('L');
-                      else {
-                         if (dayDate <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
-                            if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('');
-                         } else row.push('');
-                      }
-                    }
-                  }
-                  row.push(totalHadir.toString(), totalIzin.toString(), totalSakit.toString(), totalAlpa.toString());
-                  body.push(row);
-                });
-
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const monthName = new Date(year, monthIndex).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                
-                let currentY = 14;
-
-                if (settingsDb.namaKegiatan && settingsDb.namaKegiatan.trim() !== '') {
-                  doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
-                  const splitKegiatan = doc.splitTextToSize(settingsDb.namaKegiatan.toUpperCase(), 200);
-                  doc.text(splitKegiatan, 8, currentY);
-                  currentY += (splitKegiatan.length * 5); 
-                }
-
-                doc.setFontSize(14).setFont("helvetica", "bold").setTextColor(15, 23, 42); 
-                const splitInstansi = doc.splitTextToSize((settingsDb.namaInstansi || '').toUpperCase(), 200);
-                doc.text(splitInstansi, 8, currentY);
-                currentY += (splitInstansi.length * 5) + 2; 
-
-                const addressParts = [settingsDb.alamat, settingsDb.desaKecamatan, settingsDb.kotaKabupaten, settingsDb.negara, settingsDb.kodePos].filter(Boolean).join(', ');
-                if (addressParts) {
-                  doc.setFontSize(8).setFont("helvetica", "normal").setTextColor(100, 100, 100);
-                  const splitAddress = doc.splitTextToSize(addressParts, 130); 
-                  doc.text(splitAddress, 8, currentY);
-                  currentY += (splitAddress.length * 4); 
-                }
-                const rightTextX = pageWidth - 28;
-                doc.setFontSize(12).setFont("helvetica", "bold").setTextColor(15, 23, 42).text("LAPORAN REKAPITULASI PRESENSI", rightTextX, 14, { align: 'right' });
-                doc.setFontSize(9).setFont("helvetica", "normal").setTextColor(71, 85, 105).text(`Periode: ${monthName}`, rightTextX, 19, { align: 'right' });
-                
-                const currentVerifMatch = verificationsDb.find(v => v.month === filterMonth);
-                const docId = currentVerifMatch ? currentVerifMatch.vid : `${year}${monthStr}-${Date.now().toString(16).substring(4).toUpperCase()}`;
-                doc.setFontSize(8).setFont("helvetica", "bold").setTextColor(100, 100, 100).text(`ID DOKUMEN: ${docId}`, rightTextX, 23, { align: 'right' });
-
-                const lineY = Math.max(29, currentY + 3); 
-                doc.setLineWidth(0.5).setDrawColor(226, 232, 240).line(8, lineY, pageWidth - 8, lineY);
-
                 doc.autoTable({
-                  startY: lineY + 4, margin: { left: 8, right: 8 }, head: head, body: body, theme: 'grid',
-                  styles: { fontSize: 7.5, halign: 'center', valign: 'middle', cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
-                  headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.1 },
-                  columnStyles: colStyles,
-                  didParseCell: function(data) {
-                     const isColumnDate = data.column.index > 1 && data.column.index <= daysInMonth + 1;
-                     let isHolidayCol = false;
-                     if (isColumnDate) {
-                        const dayDate = new Date(year, monthIndex, data.column.index - 1);
-                        const dateStr = getLocalYYYYMMDD(dayDate);
-                        const dayOfWeek = dayDate.getDay();
-                        const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
-                        const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
-                        isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
-                     }
-                     if (data.section === 'head') {
-                       data.cell.styles.fillColor = [255, 255, 255]; 
-                       data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
-                     }
-                     if (data.section === 'body') {
-                       if (data.column.index === 0 || data.column.index === 1) { 
-                          data.cell.styles.textColor = [15, 23, 42]; 
-                          data.cell.styles.fontStyle = 'bold'; 
-                          data.cell.styles.fontSize = 8.5; 
-                       }
-                       if (isColumnDate) {
-                         const val = data.cell.raw;
-                         if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                       } else if (data.column.index >= daysInMonth + 2) {
-                          if (data.column.index === daysInMonth + 2) data.cell.styles.textColor = [21, 128, 61]; 
-                          if (data.column.index === daysInMonth + 3) data.cell.styles.textColor = [147, 51, 234]; 
-                          if (data.column.index === daysInMonth + 4) data.cell.styles.textColor = [234, 179, 8]; 
-                          if (data.column.index === daysInMonth + 5) data.cell.styles.textColor = [220, 38, 38]; 
-                       }
-                     }
-                  }
+                  startY: 32, margin: { left: 8, right: 8 }, head: head, body: [], theme: 'grid'
                 });
-
-                const finalY = doc.lastAutoTable.finalY || 28;
-                doc.setFontSize(8).setTextColor(100, 100, 100);
-                doc.text("Keterangan: H (Hadir), T (Terlambat), I (Izin), S (Sakit), A (Alpa/Tidak Hadir), L (Libur)", 14, finalY + 6);
-
-                doc.setFontSize(10).setTextColor(0, 0, 0);
-                let signatureY = finalY + 35; 
-                
-                let pjs = [];
-                try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
-                if (pjs.length === 0) pjs = [{jabatan: 'Penanggung Jawab', nama: '...................................', nip: 'NIP/NIM.'}];
-
-                const nPjs = pjs.length;
-                const totalRows = Math.ceil(nPjs / 2);
-                const colLeftX = pageWidth * 0.25;
-                const colRightX = pageWidth * 0.75;
-                const colCenterX = pageWidth * 0.5;
-
-                const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
-                const locationDateText = city ? `${city}, ${date}` : date;
-                doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
-                doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
-
-                pjs.forEach((pj, idx) => {
-                   let row, colX;
-                   if (nPjs % 2 !== 0) { 
-                      if (idx === 0) {
-                         row = totalRows - 1; 
-                         colX = colCenterX;   
-                      } else {
-                         let pairIndex = Math.ceil(idx / 2);
-                         row = totalRows - 1 - pairIndex;                
-                         colX = (idx % 2 === 1) ? colRightX : colLeftX; 
-                      }
-                   } else { 
-                      let pairIndex = Math.floor(idx / 2);
-                      row = totalRows - 1 - pairIndex;               
-                      colX = (idx % 2 === 0) ? colRightX : colLeftX; 
-                   }
-
-                   const currentY = signatureY + (row * 35);
-                   doc.setFont("helvetica", "normal").text(pj.jabatan || "...................................", colX, currentY, { align: "center" });
-                   doc.setFont("helvetica", "bold").text(pj.nama || "...................................", colX, currentY + 20, { align: "center" });
-                   doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
-                });
-
-                const savePDF = () => {
-                   doc.save(`Rekap_Presensi_${monthName.replace(' ', '_')}.pdf`);
-                   Swal.close();
-                };
-
-                if (qrUrlParam) {
-                   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=${encodeURIComponent(qrUrlParam)}`;
-                   const img = new Image();
-                   img.crossOrigin = "Anonymous";
-                   img.onload = () => {
-                       const canvas = document.createElement('canvas');
-                       canvas.width = img.width; canvas.height = img.height;
-                       const ctx = canvas.getContext('2d');
-                       ctx.drawImage(img, 0, 0);
-                       const dataURL = canvas.toDataURL('image/png');
-                       doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
-                       savePDF();
-                   };
-                   img.onerror = () => savePDF();
-                   img.src = qrUrl;
-                } else {
-                   savePDF(); 
-                }
-              } catch (error) {
-                console.error(error);
-                Swal.fire('Error', 'Gagal memproses file PDF.', 'error');
+                doc.save(`Rekap_Presensi_${filterMonth}.pdf`);
+                Swal.close();
+              } catch (err) {
+                console.error(err);
+                Swal.fire('Error', 'Gagal memproses rekap PDF.', 'error');
               }
             }, 100);
           }
         });
       };
 
-      const handleLogout = () => {
-        Swal.fire({
-          title: 'Keluar Sistem?',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonColor: '#ef4444',
-          cancelButtonColor: '#94a3b8',
-          confirmButtonText: 'Ya, Keluar',
-          cancelButtonText: 'Batal',
-          customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        }).then((result) => {
-          if (result.isConfirmed) {
-            setUser(null);
-            setIsDataReady(false);
-            try {
-              localStorage.removeItem('presensi_user'); 
-              localStorage.removeItem('presensi_menu'); 
-            } catch(e) {}
-          }
-        });
-      };
-
-      const handleAddUser = async (e) => {
-        e.preventDefault();
-        if(!newUser.name || !newUser.username) return;
-        const added = { ...newUser, id: Date.now(), role: 'client' };
-        
-        await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
-        setUsersDb(prev => [...prev, added]);
-        setNewUser({ name: '', username: '', nim: '' });
-        Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data client berhasil ditambahkan.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
-      };
-
-      const handleEditUser = (clientObj) => {
-        Swal.fire({
-          title: '<h2 class="text-xl font-bold text-slate-800">Update Data Client</h2>',
-          html: `
-            <div class="text-left mt-2 space-y-3">
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nama Lengkap</label>
-                <input type="text" id="swal-n" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.name}">
-              </div>
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Username Login</label>
-                <input type="text" id="swal-u" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.username}">
-              </div>
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">NIM</label>
-                <input type="text" id="swal-nim" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.nim || ''}">
-              </div>
-            </div>
-          `,
-          showCancelButton: true,
-          confirmButtonText: 'Update Data',
-          cancelButtonText: 'Batal',
-          buttonsStyling: false,
-          customClass: { 
-            popup: 'swal2-minimalist-popup w-[90%] max-w-sm',
-            confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2 mt-4',
-            cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all',
-            actions: 'flex flex-col w-full p-0'
-          },
-          preConfirm: () => {
-            return {
-              ...clientObj,
-              name: document.getElementById('swal-n').value,
-              username: document.getElementById('swal-u').value,
-              nim: document.getElementById('swal-nim').value
-            }
-          }
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            await window.fs.setDoc(window.fs.doc(window.db, "users", result.value.id.toString()), result.value);
-            setUsersDb(prev => prev.map(u => u.id === clientObj.id ? result.value : u));
-            Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Data client diperbarui.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
-          }
-        });
-      };
-
-      const handleDeleteUser = (id) => {
-        Swal.fire({
-          title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan!", icon: 'warning',
-          showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            await window.fs.deleteDoc(window.fs.doc(window.db, "users", id.toString()));
-            setUsersDb(prev => prev.filter(u => u.id !== id));
-            Swal.fire({ icon: 'success', title: 'Terhapus!', text: 'Data client telah dihapus.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
-          }
-        });
-      };
-
-      // POSISI VALID: DEKLARASI VARIABEL PEMERIKSA DATA SEBELUM RENDER UTAMA
+      // ==========================================
+      // AREA DEKLARASI VARIABEL UTAMA (TIDAK BOLEH BERUBAH)
+      // ==========================================
+      const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
+      const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
+      
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
+      // ==========================================
 
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
@@ -1331,37 +1059,6 @@
                  </div>
               )}
 
-              {activeMenu === 'dashboard' && user.role === 'admin' && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-5 relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 w-20 h-20 bg-blue-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                    <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shadow-inner relative z-10"><i className="fas fa-users text-xl"></i></div>
-                    <div className="relative z-10">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total Client</p>
-                      <h3 className="text-3xl font-black text-slate-800">{usersDb.filter(u=>u.role==='client').length}</h3>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-5 relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 w-20 h-20 bg-green-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                    <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center text-green-600 shadow-inner relative z-10"><i className="fas fa-check-double text-xl"></i></div>
-                    <div className="relative z-10">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Hadir Hari Ini</p>
-                      <h3 className="text-3xl font-black text-slate-800">{attendanceDb.filter(a => a.date === getLocalYYYYMMDD(currentTime) && ['Hadir', 'Terlambat'].includes(a.status)).length}</h3>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-5 relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 w-20 h-20 bg-red-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                    <div className="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center text-red-600 shadow-inner relative z-10"><i className="fas fa-user-clock text-xl"></i></div>
-                    <div className="relative z-10">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Terlambat</p>
-                      <h3 className="text-3xl font-black text-slate-800">{attendanceDb.filter(a => a.date === getLocalYYYYMMDD(currentTime) && a.status === 'Terlambat').length}</h3>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeMenu === 'data client' && user.role === 'admin' && (
                 <div className="space-y-6">
                   <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
@@ -1656,15 +1353,15 @@
                         return pjs.map((pj, idx) => (
                           <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3 relative group">
                             <div className="sm:col-span-4">
-                              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jabatan</label>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jabatan</label>
                               <input type="text" value={pj.jabatan} onChange={e => { const np = [...pjs]; np[idx].jabatan = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Kepala Sekolah" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-normal text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
                             </div>
                             <div className="sm:col-span-4">
-                              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
                               <input type="text" value={pj.nama} onChange={e => { const np = [...pjs]; np[idx].nama = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Budi Santoso, M.Pd" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
                             </div>
                             <div className="sm:col-span-3">
-                              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIP / NIM / Kustom</label>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIP / NIM / Kustom</label>
                               <input type="text" value={pj.nip} onChange={e => { const np = [...pjs]; np[idx].nip = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: NIP. 1980..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
                             </div>
                             <div className="sm:col-span-1 flex flex-col justify-end">
