@@ -643,8 +643,8 @@
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
         const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
 
-        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan sebagai hari libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
-        if (holidaysDb.find(h => h.date === todayStr)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini adalah tanggal merah.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan sebagai hari libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+        if (holidaysDb.find(h => h.date === todayStr)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini adalah tanggal merah.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
 
         const executePresensi = async () => {
           const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -733,7 +733,6 @@
         });
       };
 
-      // REPERBAIKAN UTAMA: Perbaikan parameter dinamis qrUrlParam dan parsing baris tabel jspdf
       const handleDownloadPDF = async () => {
         const defaultDate = currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const defaultCity = settingsDb.kotaKabupaten || '';
@@ -1128,6 +1127,21 @@
             Swal.fire({ icon: 'success', title: 'Terhapus!', text: 'Riwayat presensi dihapus.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
         });
+      };
+
+      const ensureAllClientsHaveRecord = async (todayStr, skipUserId) => {
+          const clients = usersDb.filter(u => u.role === 'client');
+          let additions = [];
+          for (const client of clients) {
+              if (client.id === skipUserId) continue;
+              const hasRec = attendanceDb.some(a => a.userId === client.id && a.date === todayStr) || additions.some(a => a.userId === client.id);
+              if (!hasRec) {
+                  const pRec = { id: Date.now() + client.id, userId: client.id, date: todayStr, timeIn: '-', timeOut: '-', status: 'Menunggu' };
+                  additions.push(pRec);
+                  window.fs.setDoc(window.fs.doc(window.db, "attendance", pRec.id.toString()), pRec).catch(e => console.error(e));
+              }
+          }
+          return additions;
       };
 
       const todayStr = getLocalYYYYMMDD(currentTime);
@@ -1665,6 +1679,8 @@
                        <th className="px-4 py-3 font-bold">Nama Lengkap</th>
                        <th className="px-4 py-3 font-bold">Jam Masuk</th>
                        <th className="px-4 py-3 font-bold">Jam Pulang</th>
+                       <!-- DIKEMBALIKAN: Penulisan kolom header Status Kehadiran secara valid -->
+                       <th className="px-4 py-3 font-bold">Status Kehadiran</th>
                        <th className="px-4 py-3 font-bold text-right">Aksi</th>
                      </tr>
                    </thead>
@@ -1678,13 +1694,23 @@
                            <td className="px-4 py-3 font-semibold text-slate-800 text-sm">{u.name}</td>
                            <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeIn}</td>
                            <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeOut || '-'}</td>
+                           <!-- DIKEMBALIKAN: Kolom visual Status Kehadiran siswa di menu laporan -->
+                           <td className="px-4 py-3">
+                             <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                               ['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : 
+                               record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 
+                               'bg-purple-100 text-purple-700 border border-purple-200'
+                             }`}>
+                               {record.status}
+                             </span>
+                           </td>
                            <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
                              <button onClick={() => handleEditAttendance(record)} className="w-7 h-7 bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Edit Presensi"><i className="fas fa-edit text-xs"></i></button>
                              <button onClick={() => handleDeleteAttendance(record.id)} className="w-7 h-7 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Hapus Presensi"><i className="fas fa-trash-alt text-xs"></i></button>
                            </td>
                          </tr>
                        )
-                     }) : <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-box-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> }
+                     }) : <tr><td colSpan="6" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-box-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> }
                    </tbody>
                  </table>
                </div>
