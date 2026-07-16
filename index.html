@@ -286,8 +286,8 @@
       const [isLocating, setIsLocating] = useState(false); 
       const [isSavingSettings, setIsSavingSettings] = useState(false); 
       
-      const [isSystemEmpty, setIsSystemEmpty] = useState(false); // Deteksi jika database belum ada user
-      const [regForm, setRegForm] = useState({ name: '', username: '', nim: '' }); // Form khusus registrasi admin pertama
+      const [isSystemEmpty, setIsSystemEmpty] = useState(false); 
+      const [regForm, setRegForm] = useState({ name: '', username: '' }); // Form registrasi diperbarui (field nim dihapus)
 
       const [user, setUser] = useState(() => {
         try {
@@ -396,18 +396,14 @@
       useEffect(() => {
         const initData = async () => {
           try {
-            // Aktifkan gerbang token aman Firestore via Anonim Auth
             await window.fs.signInAnonymously(window.auth);
 
-            // Ambil daftar users untuk mengecek apakah pangkalan data kosong
             const usersSnap = await window.fs.getDocs(window.fs.collection(window.db, "users"));
             
             if (usersSnap.empty) {
-               // JIKA KOSONG: Aktifkan mode register utama
                setIsSystemEmpty(true);
                setSettingsDb(prev => ({ ...prev, namaInstansi: "Setup Sistem Baru" }));
             } else {
-               // JIKA ADA DATA: Jalankan alur seperti biasa
                setIsSystemEmpty(false);
                let savedUserStr = null;
                try { savedUserStr = localStorage.getItem('presensi_user'); } catch(e) {}
@@ -483,7 +479,6 @@
         }
       };
 
-      // Fungsi khusus untuk pendaftaran pertama kali (Dinamis dari Web UI)
       const handleRegisterAdmin = async (e) => {
         e.preventDefault();
         if(!regForm.name || !regForm.username) return;
@@ -499,10 +494,9 @@
             name: regForm.name.trim(),
             username: regForm.username.trim().toLowerCase(),
             role: 'admin',
-            nim: regForm.nim.trim() || 'ROOT-HRD'
+            nim: null // NIM diatur null secara eksplisit di database untuk role admin
           };
 
-          // Tembak data langsung ke Firestore
           await window.fs.setDoc(window.fs.doc(window.db, "users", mainAdmin.id.toString()), mainAdmin);
           
           Swal.fire({
@@ -1077,7 +1071,7 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // GUARD SCREEN 1: BILA DATABASE KOSONG, TAMPILKAN REGISTER UTAMA
+      // GUARD SCREEN 1: BILA DATABASE KOSONG, TAMPILKAN REGISTER UTAMA (KOLOM NIM DIHAPUS)
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 relative z-10">
@@ -1097,17 +1091,13 @@
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">Username Login Admin</label>
                 <input type="text" required value={regForm.username} onChange={e=>setRegForm({...regForm, username:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 text-sm" placeholder="Contoh: masteradmin" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">NIM / Kode Penanda (Opsional)</label>
-                <input type="text" value={regForm.nim} onChange={e=>setRegForm({...regForm, nim:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-700 text-sm" placeholder="Contoh: 123456" />
-              </div>
-              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm mt-2">Daftar & Amankan Sistem</button>
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm mt-4">Daftar & Amankan Sistem</button>
             </form>
           </div>
         </div>
       );
 
-      // GUARD SCREEN 2: JIKA SUDAH ADA USER, TAMPILKAN LOGIN SEPERTI BIASA
+      // GUARD SCREEN 2: LOGIN SCREEN
       if (!user) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
