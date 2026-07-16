@@ -23,9 +23,7 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    aside::-webkit-scrollbar { width: 6px; }
-    aside::-webkit-scrollbar-track { background: transparent; }
-    aside::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    aside::-webkit-scrollbar-thumb { background: #334155; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -775,6 +773,10 @@
         });
       };
 
+      const handleGenerateVerif = () => {
+         Swal.fire('Info', 'Fitur verifikasi tautan sedang disiapkan untuk pembaruan berikutnya.', 'info');
+      };
+
       const handleDownloadPDF = async () => {
         const defaultDate = currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const defaultCity = settingsDb.kotaKabupaten || '';
@@ -987,9 +989,9 @@
                    Swal.close();
                 };
 
-                const targetQrData = settingsDb.appScriptUrl;
-                if (targetQrData && targetQrData.trim() !== "") {
-                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(targetQrData);
+                const qrUrlParam = settingsDb.appScriptUrl;
+                if (qrUrlParam && qrUrlParam.trim() !== "") {
+                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(qrUrlParam);
                    const img = new Image();
                    img.crossOrigin = "Anonymous";
                    img.onload = () => {
@@ -1462,7 +1464,7 @@
                         <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
                           <div className="space-y-1">
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-closed mr-1.5 text-slate-500"></i>Jam Pulang</p>
-                            <p className="text-3xl font-black tabular-nums">{activeRec.timeOut || '--:--'}</p>
+                            <p className="text-3xl font-black tabular-nums text-slate-300">{activeRec.timeOut || '--:--'}</p>
                           </div>
                           {activeRec.timeOut ? (
                             <div className="bg-blue-500/20 p-2.5 rounded-lg border border-blue-500/30"><i className="fas fa-check text-xl text-blue-400"></i></div>
@@ -1503,17 +1505,17 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
-                               </td>
-                             </tr>
-                           ))
-                         ) : ( 
-                           <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> 
-                         )}
-                       </tbody>
-                     </table>
-                   </div>
-                 </div>
-              )}
+                           </td>
+                         </tr>
+                       ))
+                     ) : ( 
+                       <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada riwayat presensi yang tersimpan.</td></tr> 
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+          )}
 
           {activeMenu === 'dashboard' && user.role === 'admin' && (
             <div className="space-y-8 animate-fadeIn">
@@ -1869,6 +1871,6 @@
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
-</script>
+  </script>
 </body>
 </html>
