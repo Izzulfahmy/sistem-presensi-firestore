@@ -989,12 +989,13 @@
                    Swal.close();
                 };
 
-                const qrUrlParam = settingsDb.appScriptUrl;
-                if (qrUrlParam && qrUrlParam.trim() !== "") {
-                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(qrUrlParam);
+                // PERBAIKAN TOTAL: Membaca langsung dari React state global (settingsDb) untuk menghindari asinkronus scope loss
+                const currentAppScriptUrl = settingsDb.appScriptUrl;
+                if (currentAppScriptUrl && currentAppScriptUrl.trim() !== "") {
+                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(currentAppScriptUrl);
                    const img = new Image();
                    img.crossOrigin = "Anonymous";
-                   img.onload = () => {
+                   img.onload = function() {
                        const canvas = document.createElement('canvas');
                        canvas.width = img.width; canvas.height = img.height;
                        const ctx = canvas.getContext('2d');
@@ -1442,7 +1443,7 @@
                           </div>
                         </div>
                       ) : !activeRec.timeOut && !['Izin', 'Sakit', 'Alpa'].includes(activeRec.status) ? (
-                        <button onClick={() => performPresensi('pulang')} disabled={isLocating} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-orange-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-sign-out-alt mr-2"></i> Pulang Sekarang</button>
+                        <button onClick={() => performPresensi('pulang')} disabled={isLocating} className="w-full bg-orange-500 hover:Orange-600 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-orange-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-sign-out-alt mr-2"></i> Pulang Sekarang</button>
                       ) : (
                         <div className="w-full bg-green-50 text-green-700 p-4 rounded-xl font-bold border border-green-200 flex items-center justify-center space-x-2 text-base"><i className="fas fa-check-circle text-xl"></i><span>Tugas Selesai / {activeRec.status}</span></div>
                       )}
@@ -1464,7 +1465,7 @@
                         <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
                           <div className="space-y-1">
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-closed mr-1.5 text-slate-500"></i>Jam Pulang</p>
-                            <p className="text-3xl font-black tabular-nums text-slate-300">{activeRec.timeOut || '--:--'}</p>
+                            <p className="text-3xl font-black tabular-nums">{activeRec.timeOut || '--:--'}</p>
                           </div>
                           {activeRec.timeOut ? (
                             <div className="bg-blue-500/20 p-2.5 rounded-lg border border-blue-500/30"><i className="fas fa-check text-xl text-blue-400"></i></div>
@@ -1594,7 +1595,7 @@
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-clipboard-list mr-2 text-blue-600"></i>Status Pemantauan Client Hari Ini</h3>
                     <p className="text-xs text-slate-400 font-medium mt-0.5">Daftar rekapan real-time seluruh personil client per tanggal {currentTime.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
                   </div>
-                  <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-wider tracking-tight tabular-nums">Hari Aktif</span>
+                  <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-wider tracking-tight tabular-nums">Hari Hacktif</span>
                 </div>
                 <div className="overflow-x-auto p-2">
                   <table className="w-full text-left border-collapse min-w-[500px]">
