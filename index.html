@@ -628,7 +628,7 @@
           `,
           showCancelButton: true, confirmButtonText: 'Simpan Kehadiran', cancelButtonText: 'Batal', buttonsStyling: false,
           customClass: { 
-            popup: 'swal2-minimalist-popup w-[90%] max-w-md', 
+            popup: 'swal2-minimalist-popup w-[90%] max-md', 
             confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all mb-2 mt-4 text-sm', 
             cancelButton: 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all text-sm', 
             actions: 'flex flex-col w-full p-0' 
@@ -985,9 +985,9 @@
                    Swal.close();
                 };
 
-                const qrUrlParam = settingsDb.appScriptUrl;
-                if (qrUrlParam && qrUrlParam.trim() !== "") {
-                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(qrUrlParam);
+                const targetQrData = settingsDb.appScriptUrl;
+                if (targetQrData && targetQrData.trim() !== "") {
+                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(targetQrData);
                    const img = new Image();
                    img.crossOrigin = "Anonymous";
                    img.onload = () => {
@@ -1860,11 +1860,13 @@
             </div>
           )}
         </div>
-      );
-    }
+      </main>
+    </div>
+  );
+}
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
 </body>
 </html>
