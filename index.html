@@ -637,6 +637,140 @@
         });
       };
 
+      // MENYISIPKAN KEMBALI FUNGSI PRESENSI DIGITAL DAN PENGAJUAN IZIN/SAKIT (RE-IMPLEMENTED)
+      const performPresensi = async (tipe) => {
+        const todayStr = getLocalYYYYMMDD(currentTime);
+        const day = currentTime.getDay();
+        const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+        const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+
+        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan sebagai hari libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+        if (holidaysDb.find(h => h.date === todayStr)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini adalah tanggal merah.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+
+        const executePresensi = async () => {
+          const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          if (tipe === 'masuk') {
+            let late = false;
+            if (String(settingsDb.useTime).toLowerCase() === 'true') {
+              const b = settingsDb.jamMasuk.split(':'), a = time.split(':');
+              late = parseInt(a[0]) > parseInt(b[0]) || (a[0] === b[0] && parseInt(a[1]) > parseInt(b[1]));
+            }
+            
+            let existingUserRec = attendanceDb.find(a => a.userId === user?.id && a.date === todayStr);
+            let updatedRec;
+
+            if (existingUserRec) {
+                updatedRec = { ...existingUserRec, timeIn: time, status: late ? 'Terlambat' : 'Hadir' };
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), { timeIn: time, status: updatedRec.status });
+            } else {
+                updatedRec = { id: Date.now(), userId: user?.id, date: todayStr, timeIn: time, timeOut: null, status: late ? 'Terlambat' : 'Hadir' };
+                await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
+            }
+
+            const newPlaceholders = await ensureAllClientsHaveRecord(todayStr, user?.id);
+            const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
+            setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
+
+            Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          
+          } else {
+            const activeRec = attendanceDb.find(a => a.userId === user?.id && a.date === todayStr && a.status !== 'Menunggu');
+            if(activeRec) {
+                const up = attendanceDb.map(r => r.id === activeRec.id ? {...r, timeOut: time} : r);
+                setAttendanceDb(up);
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", activeRec.id.toString()), { timeOut: time });
+                Swal.fire({ icon: 'success', title: 'Berhasil Pulang', text: `Sampai jumpa! Dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            }
+          }
+        };
+
+        if (String(settingsDb.useLocation).toLowerCase() === 'true') {
+          if (!settingsDb.lokasi || settingsDb.lokasi.includes('Memuat')) return Swal.fire({title: 'Error Konfigurasi', text:'Lokasi kantor belum diset.', icon:'warning', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+          setIsLocating(true);
+          navigator.geolocation.getCurrentPosition(pos => {
+            const off = settingsDb.lokasi.split(',');
+            const dist = calculateDistance(pos.coords.latitude, pos.coords.longitude, parseFloat(off[0]), parseFloat(off[1]));
+            setIsLocating(false);
+            if (dist > 100) return Swal.fire({ icon: 'error', title: 'Di Luar Jangkauan', html: `Jarak Anda <b>${Math.round(dist)} meter</b> dari lokasi.<br><span class="text-sm">(Maksimal: 100 meter)</span>`, confirmButtonColor: '#ef4444', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            executePresensi();
+          }, err => { setIsLocating(false); Swal.fire({title: 'GPS Error', text:'Pastikan GPS menyala.', icon:'error', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }}); }, { enableHighAccuracy: true });
+        } else executePresensi();
+      };
+
+      const performIzinSakit = (tipe) => {
+        const todayStr = getLocalYYYYMMDD(currentTime);
+        const day = currentTime.getDay();
+        const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
+        const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
+
+        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+        if (holidaysDb.find(h => h.date === todayStr)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini tanggal merah.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+
+        Swal.fire({
+          title: `Pengajuan ${tipe}`, text: `Anda akan tercatat ${tipe} untuk hari ini. Lanjutkan?`, icon: 'question',
+          showCancelButton: true, confirmButtonColor: '#3b82f6', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Lanjutkan', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
+        }).then(async res => {
+          if (res.isConfirmed) {
+            const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            let existingUserRec = attendanceDb.find(a => a.userId === user?.id && a.date === todayStr);
+            let updatedRec;
+
+            if (existingUserRec) {
+                updatedRec = { ...existingUserRec, timeIn: time, timeOut: '-', status: tipe };
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), { timeIn: time, timeOut: '-', status: tipe });
+            } else {
+                updatedRec = { id: Date.now(), userId: user?.id, date: todayStr, timeIn: time, timeOut: '-', status: tipe };
+                await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
+            }
+
+            const newPlaceholders = await ensureAllClientsHaveRecord(todayStr, user?.id);
+            const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
+            setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
+
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: `Status ${tipe} berhasil dicatat.`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          }
+        });
+      };
+
+      const handleGenerateVerif = async () => {
+         Swal.fire({html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Menyiapkan Tautan Unik...</p></div>', showConfirmButton: false, allowOutsideClick: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }});
+         
+         try {
+            const uniqueChars = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const vid = filterMonth.replace('-', '') + '-' + uniqueChars;
+            
+            let currentUrl = window.location.origin + window.location.pathname;
+            if (currentUrl.endsWith('index.html')) {
+               currentUrl = currentUrl.replace('index.html', 'verification.html');
+            } else if (currentUrl.endsWith('/')) {
+               currentUrl = currentUrl + 'verification.html';
+            } else {
+               currentUrl = currentUrl + '/verification.html';
+            }
+            
+            if(settingsDb.appScriptUrl && settingsDb.appScriptUrl.trim() !== '') {
+               let customBase = settingsDb.appScriptUrl.trim();
+               if (!customBase.includes('verification.html')) {
+                  customBase = customBase.replace(/\/$/, "") + '/verification.html';
+               }
+               currentUrl = customBase;
+            }
+            
+            const separator = currentUrl.includes("?") ? "&" : "?";
+            const finalUrl = `${currentUrl}${separator}vid=${vid}`;
+            
+            const newVerif = { month: filterMonth, vid: vid, url: finalUrl };
+            await window.fs.setDoc(window.fs.doc(window.db, "verifications", filterMonth), newVerif);
+            
+            setVerificationsDb(prev => [...prev.filter(v => v.month !== filterMonth), newVerif]);
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Tautan Verifikasi untuk bulan ini berhasil dibuat!', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+         } catch (e) {
+            Swal.fire('Error', 'Gagal membuat tautan verifikasi', 'error');
+         }
+      };
+
       const handleDownloadPDF = async () => {
         const defaultDate = currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const defaultCity = settingsDb.kotaKabupaten || '';
@@ -818,7 +952,7 @@
 
                 const mengetahuiX = (nPjs === 1) ? colCenterX : colRightX;
                 const locationDateText = city ? `${city}, ${date}` : date;
-                doc.text(locationDateText, mainstayX => {}, signatureY - 14, { align: "center" });
+                doc.text(locationDateText, mengetahuiX, signatureY - 14, { align: "center" });
                 doc.text("Mengetahui,", mengetahuiX, signatureY - 8, { align: "center" });
 
                 pjs.forEach((pj, idx) => {
@@ -1020,7 +1154,21 @@
         });
       };
 
-      // PERBAIKAN TOTAL: Gunakan optional chaining (?.) untuk mencegah error render jika user belum terautentikasi
+      const ensureAllClientsHaveRecord = async (todayStr, skipUserId) => {
+          const clients = usersDb.filter(u => u.role === 'client');
+          let additions = [];
+          for (const client of clients) {
+              if (client.id === skipUserId) continue;
+              const hasRec = attendanceDb.some(a => a.userId === client.id && a.date === todayStr) || additions.some(a => a.userId === client.id);
+              if (!hasRec) {
+                  const pRec = { id: Date.now() + client.id, userId: client.id, date: todayStr, timeIn: '-', timeOut: '-', status: 'Menunggu' };
+                  additions.push(pRec);
+                  window.fs.setDoc(window.fs.doc(window.db, "attendance", pRec.id.toString()), pRec).catch(e => console.error(e));
+              }
+          }
+          return additions;
+      };
+
       const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
       const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
       
@@ -1028,7 +1176,6 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // GUARD SCREEN 1: SETUP UTAMA
       if (isSystemEmpty) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 relative z-10">
@@ -1054,7 +1201,6 @@
         </div>
       );
 
-      // GUARD SCREEN 2: LOGIN UTAMA (Aman 100% dari error reading property null)
       if (!user) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
@@ -1076,7 +1222,6 @@
         </div>
       );
 
-      // GUARD SCREEN 3: LOADING SYNCING DASHBOARD
       if (!isDataReady) return (
         <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
           <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
@@ -1089,23 +1234,19 @@
 
       return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
-          
           <nav className="lg:hidden w-full bg-slate-900 text-white p-3 shadow-xl z-30 shrink-0">
             <div className="flex items-center justify-between mb-3 px-2 border-b border-slate-800 pb-3">
                <div className="flex items-center space-x-2.5">
                  <div className="bg-blue-600 p-2 rounded-lg shadow-inner shadow-blue-400/20"><i className="fas fa-fingerprint text-xs text-white"></i></div>
                  <h2 className="text-sm font-black tracking-tight uppercase">Sistem Presensi PPL 2</h2>
                </div>
-               
                <div className="flex items-center space-x-3">
                  <div className="text-right hidden xs:block sm:block">
                    <p className="text-[10px] font-bold text-slate-200 leading-none">{user.name}</p>
                    <p className="text-[8px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{user.role}</p>
                  </div>
-                 
                  <button onClick={handleLogout} className="flex items-center gap-1.5 border border-slate-700 bg-slate-800 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all active:scale-[0.98] shadow-sm shrink-0">
-                   <i className="fas fa-power-off text-xs"></i>
-                   <span className="text-[9px] font-bold uppercase tracking-wider">Keluar</span>
+                   <i className="fas fa-power-off text-xs"></i><span className="text-[9px] font-bold uppercase tracking-wider">Keluar</span>
                  </button>
                </div>
             </div>
@@ -1147,17 +1288,14 @@
               <div className="bg-blue-500 p-2 rounded-lg"><i className="fas fa-fingerprint text-white text-lg"></i></div>
               <h2 className="text-xl font-bold tracking-tight">Sistem Presensi PPL 2</h2>
             </div>
-            
             <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
               <button onClick={() => changeMenu('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 shadow-md shadow-blue-900/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><i className="fas fa-home w-5 text-center"></i><span className="font-semibold text-sm">Dashboard</span></button>
-              
               {user.role === 'client' && (
                 <>
                   <button onClick={() => changeMenu('riwayat')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeMenu === 'riwayat' ? 'bg-blue-600 shadow-md shadow-blue-900/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><i className="fas fa-history w-5 text-center"></i><span className="font-semibold text-sm">Riwayat Presensi</span></button>
                   <button onClick={() => changeMenu('kalender')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeMenu === 'kalender' ? 'bg-blue-600 shadow-md shadow-blue-900/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><i className="fas fa-calendar-alt w-5 text-center"></i><span className="font-semibold text-sm">Kalender</span></button>
                 </>
               )}
-              
               {user.role === 'admin' && <>
                 <button onClick={() => changeMenu('data client')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeMenu === 'data client' ? 'bg-blue-600 shadow-md shadow-blue-900/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><i className="fas fa-users w-5 text-center"></i><span className="font-semibold text-sm">Data Client</span></button>
                 <button onClick={() => changeMenu('laporan')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeMenu === 'laporan' ? 'bg-blue-600 shadow-md shadow-blue-900/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><i className="fas fa-file-invoice w-5 text-center"></i><span className="font-semibold text-sm">Laporan Presensi</span></button>
@@ -1165,7 +1303,6 @@
                 <button onClick={() => changeMenu('profil')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeMenu === 'profil' ? 'bg-blue-600 shadow-md shadow-blue-900/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><i className="fas fa-building w-5 text-center"></i><span className="font-semibold text-sm">Profil Instansi</span></button>
               </>}
             </nav>
-            
             <div className="p-5 border-t border-slate-800/80">
               <button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 bg-slate-800 hover:bg-red-500 hover:text-white text-slate-300 p-3 rounded-xl font-semibold text-sm transition-all"><i className="fas fa-power-off"></i><span>Keluar</span></button>
             </div>
@@ -1173,7 +1310,6 @@
 
           <main className="flex-1 overflow-y-auto relative bg-slate-50/80">
             <div className="p-4 md:p-8 max-w-6xl mx-auto min-h-full">
-              
               <header className="flex flex-col md:flex-row md:justify-between items-start md:items-end mb-8 space-y-5 md:space-y-0">
                 <div className="w-full md:w-auto flex flex-col">
                   <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight capitalize leading-none">{activeMenu.replace('-', ' ')}</h1>
@@ -1225,323 +1361,294 @@
                       {!activeRec ? (
                         <div className="flex flex-col space-y-3">
                           <button onClick={() => performPresensi('masuk')} disabled={isLocating} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-blue-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-sign-in-alt mr-2"></i> Presensi Sekarang</button>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => performIzinSakit('Izin')} disabled={isLocating} className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-xl text-sm shadow-md shadow-purple-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-envelope-open-text mr-2"></i> Izin</button>
-                        <button onClick={() => performIzinSakit('Sakit')} disabled={isLocating} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-xl text-sm shadow-md shadow-yellow-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-notes-medical mr-2"></i> Sakit</button>
-                      </div>
-                    </div>
-                  ) : !activeRec.timeOut && !['Izin', 'Sakit', 'Alpa'].includes(activeRec.status) ? (
-                    <button onClick={() => performPresensi('pulang')} disabled={isLocating} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-orange-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-sign-out-alt mr-2"></i> Pulang Sekarang</button>
-                  ) : (
-                    <div className="w-full bg-green-50 text-green-700 p-4 rounded-xl font-bold border border-green-200 flex items-center justify-center space-x-2 text-base"><i className="fas fa-check-circle text-xl"></i><span>Tugas Selesai / {activeRec.status}</span></div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-900 p-6 sm:p-8 rounded-2xl shadow-xl text-white flex flex-col relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-blue-900/20 to-transparent pointer-events-none"></div>
-                <h3 className="text-xl font-bold mb-8 border-b border-slate-800 pb-4 relative z-10 flex items-center"><i className="fas fa-clipboard-check mr-3 text-blue-400"></i>Status Kehadiran</h3>
-                {activeRec ? (
-                  <div className="space-y-6 relative z-10 flex-1 justify-center flex flex-col">
-                    <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
-                      <div className="space-y-1">
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-open mr-1.5 text-slate-500"></i>Jam Masuk</p>
-                        <p className="text-3xl font-black tabular-nums">{activeRec.timeIn}</p>
-                      </div>
-                      <span className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide shadow-md ${['Hadir', 'Terlambat'].includes(activeRec.status) ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}`}>{activeRec.status}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
-                      <div className="space-y-1">
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-closed mr-1.5 text-slate-500"></i>Jam Pulang</p>
-                        <p className="text-3xl font-black tabular-nums text-slate-300">{activeRec.timeOut || '--:--'}</p>
-                      </div>
-                      {activeRec.timeOut ? (
-                        <div className="bg-blue-500/20 p-2.5 rounded-lg border border-blue-500/30"><i className="fas fa-check text-xl text-blue-400"></i></div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button onClick={() => performIzinSakit('Izin')} disabled={isLocating} className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-xl text-sm shadow-md shadow-purple-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-envelope-open-text mr-2"></i> Izin</button>
+                            <button onClick={() => performIzinSakit('Sakit')} disabled={isLocating} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-xl text-sm shadow-md shadow-yellow-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-notes-medical mr-2"></i> Sakit</button>
+                          </div>
+                        </div>
+                      ) : !activeRec.timeOut && !['Izin', 'Sakit', 'Alpa'].includes(activeRec.status) ? (
+                        <button onClick={() => performPresensi('pulang')} disabled={isLocating} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl text-base shadow-lg shadow-orange-200/50 transform transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center"><i className="fas fa-sign-out-alt mr-2"></i> Pulang Sekarang</button>
                       ) : (
-                        <span className="text-[10px] font-bold text-orange-400 animate-pulse bg-orange-500/10 px-3 py-1.5 rounded-md border border-orange-500/20">Menunggu</span>
+                        <div className="w-full bg-green-50 text-green-700 p-4 rounded-xl font-bold border border-green-200 flex items-center justify-center space-x-2 text-base"><i className="fas fa-check-circle text-xl"></i><span>Tugas Selesai / {activeRec.status}</span></div>
                       )}
                     </div>
-                  </div> 
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-40 relative z-10 py-6">
-                    <i className="fas fa-mug-hot text-5xl mb-4"></i>
-                    <p className="font-semibold text-sm">Belum ada data presensi hari ini.</p>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {activeMenu === 'riwayat' && user.role === 'client' && (
-             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-               <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex items-center"><i className="fas fa-history mr-2 text-blue-600"></i><h3 className="text-lg font-bold text-slate-800">Catatan Kehadiran Anda</h3></div>
-               <div className="overflow-x-auto p-2">
-                 <table className="w-full text-left border-collapse min-w-[500px]">
-                   <thead>
-                     <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
-                       <th className="px-4 py-3 font-bold">Tanggal</th>
-                       <th className="px-4 py-3 font-bold">Jam Masuk</th>
-                       <th className="px-4 py-3 font-bold">Jam Pulang</th>
-                       <th className="px-4 py-3 font-bold">Status</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-50">
-                     {attendanceDb.filter(a => a.userId === user.id).length > 0 ? (
-                       attendanceDb.filter(a => a.userId === user.id).sort((a,b) => new Date(b.date) - new Date(a.date)).map(record => (
-                         <tr key={record.id} className="hover:bg-slate-50/80 transition-colors">
-                           <td className="px-4 py-3 text-slate-700 font-semibold">{new Date(record.date).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}</td>
-                           <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeIn}</td>
-                           <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
-                           <td className="px-4 py-3">
-                             <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
-                           </td>
+                  <div className="bg-slate-900 p-6 sm:p-8 rounded-2xl shadow-xl text-white flex flex-col relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-blue-900/20 to-transparent pointer-events-none"></div>
+                    <h3 className="text-xl font-bold mb-8 border-b border-slate-800 pb-4 relative z-10 flex items-center"><i className="fas fa-clipboard-check mr-3 text-blue-400"></i>Status Kehadiran</h3>
+                    {activeRec ? (
+                      <div className="space-y-6 relative z-10 flex-1 justify-center flex flex-col">
+                        <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
+                          <div className="space-y-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-open mr-1.5 text-slate-500"></i>Jam Masuk</p>
+                            <p className="text-3xl font-black tabular-nums">{activeRec.timeIn}</p>
+                          </div>
+                          <span className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide shadow-md ${['Hadir', 'Terlambat'].includes(activeRec.status) ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}`}>{activeRec.status}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
+                          <div className="space-y-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-closed mr-1.5 text-slate-500"></i>Jam Pulang</p>
+                            <p className="text-3xl font-black tabular-nums text-slate-300">{activeRec.timeOut || '--:--'}</p>
+                          </div>
+                          {activeRec.timeOut ? (
+                            <div className="bg-blue-500/20 p-2.5 rounded-lg border border-blue-500/30"><i className="fas fa-check text-xl text-blue-400"></i></div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-orange-400 animate-pulse bg-orange-500/10 px-3 py-1.5 rounded-md border border-orange-500/20">Menunggu</span>
+                          )}
+                        </div>
+                      </div> 
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center opacity-40 relative z-10 py-6">
+                        <i className="fas fa-mug-hot text-5xl mb-4"></i>
+                        <p className="font-semibold text-sm">Belum ada data presensi hari ini.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeMenu === 'riwayat' && user.role === 'client' && (
+                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                   <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex items-center"><i className="fas fa-history mr-2 text-blue-600"></i><h3 className="text-lg font-bold text-slate-800">Catatan Kehadiran Anda</h3></div>
+                   <div className="overflow-x-auto p-2">
+                     <table className="w-full text-left border-collapse min-w-[500px]">
+                       <thead>
+                         <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
+                           <th className="px-4 py-3 font-bold">Tanggal</th>
+                           <th className="px-4 py-3 font-bold">Jam Masuk</th>
+                           <th className="px-4 py-3 font-bold">Jam Pulang</th>
+                           <th className="px-4 py-3 font-bold">Status</th>
                          </tr>
-                       ))
-                     ) : ( 
-                       <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada riwayat presensi yang tersimpan.</td></tr> 
-                     )}
-                   </tbody>
-                 </table>
-               </div>
-             </div>
-          )}
+                       </thead>
+                       <tbody className="divide-y divide-slate-50">
+                         {attendanceDb.filter(a => a.userId === user.id).length > 0 ? (
+                           attendanceDb.filter(a => a.userId === user.id).sort((a,b) => new Date(b.date) - new Date(a.date)).map(record => (
+                             <tr key={record.id} className="hover:bg-slate-50/80 transition-colors">
+                               <td className="px-4 py-3 text-slate-700 font-semibold">{new Date(record.date).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}</td>
+                               <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeIn}</td>
+                               <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
+                               <td className="px-4 py-3">
+                                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
+                               </td>
+                             </tr>
+                           ))
+                         ) : ( 
+                           <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada riwayat presensi yang tersimpan.</td></tr> 
+                         )}
+                       </tbody>
+                     </table>
+                   </div>
+                 </div>
+              )}
 
-          {activeMenu === 'dashboard' && user.role === 'admin' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-5 relative overflow-hidden group">
-                <div className="absolute right-0 top-0 w-20 h-20 bg-blue-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shadow-inner relative z-10"><i className="fas fa-users text-xl"></i></div>
-                <div className="relative z-10">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total Client</p>
-                  <h3 className="text-3xl font-black text-slate-800">{usersDb.filter(u=>u.role==='client').length}</h3>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-5 relative overflow-hidden group">
-                <div className="absolute right-0 top-0 w-20 h-20 bg-green-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center text-green-600 shadow-inner relative z-10"><i className="fas fa-check-double text-xl"></i></div>
-                <div className="relative z-10">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Hadir Hari Ini</p>
-                  <h3 className="text-3xl font-black text-slate-800">{attendanceDb.filter(a => a.date === getLocalYYYYMMDD(currentTime) && ['Hadir', 'Terlambat'].includes(a.status)).length}</h3>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-5 relative overflow-hidden group">
-                <div className="absolute right-0 top-0 w-20 h-20 bg-red-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                <div className="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center text-red-600 shadow-inner relative z-10"><i className="fas fa-user-clock text-xl"></i></div>
-                <div className="relative z-10">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Terlambat</p>
-                  <h3 className="text-3xl font-black text-slate-800">{attendanceDb.filter(a => a.date === getLocalYYYYMMDD(currentTime) && a.status === 'Terlambat').length}</h3>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeMenu === 'data client' && user.role === 'admin' && (
-            <div className="space-y-6">
-              <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center"><i className="fas fa-user-plus mr-2 text-blue-600 bg-blue-50 p-1.5 rounded"></i> Pendaftaran Client Baru</h3>
-                <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
-                    <input type="text" required value={newUser.name} onChange={e=>setNewUser({...newUser, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Cth: Joko Widodo"/>
+              {activeMenu === 'data client' && user.role === 'admin' && (
+                <div className="space-y-6">
+                  <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center"><i className="fas fa-user-plus mr-2 text-blue-600 bg-blue-50 p-1.5 rounded"></i> Pendaftaran Client Baru</h3>
+                    <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
+                        <input type="text" required value={newUser.name} onChange={e=>setNewUser({...newUser, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Cth: Joko Widodo"/>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Username Login</label>
+                        <input type="text" required value={newUser.username} onChange={e=>setNewUser({...newUser, username: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Cth: Joko"/>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIM</label>
+                        <input type="text" value={newUser.nim} onChange={e=>setNewUser({...newUser, nim: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Cth: 200100..."/>
+                      </div>
+                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-md shadow-blue-200 transition-all active:scale-95 h-[42px] text-sm">Simpan Data</button>
+                    </form>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Username Login</label>
-                    <input type="text" required value={newUser.username} onChange={e=>setNewUser({...newUser, username: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Cth: Joko"/>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIM</label>
-                    <input type="text" value={newUser.nim} onChange={e=>setNewUser({...newUser, nim: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Cth: 200100..."/>
-                  </div>
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-md shadow-blue-200 transition-all active:scale-95 h-[42px] text-sm">Simpan Data</button>
-                </form>
-              </div>
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50"><h3 className="text-base font-bold text-slate-800">Daftar Akun Client</h3></div>
-                <div className="overflow-x-auto p-2">
-                  <table className="w-full text-left border-collapse min-w-[500px]">
-                     <thead>
-                       <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
-                         <th className="px-4 py-3 font-bold">Nama Lengkap</th>
-                         <th className="px-4 py-3 font-bold">Username</th>
-                         <th className="px-4 py-3 font-bold">NIM</th>
-                         <th className="px-4 py-3 font-bold text-right">Manajemen</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-50">
-                       {usersDb.filter(u => u.role === 'client').map(u => (
-                         <tr key={u.id} className="hover:bg-slate-50/80 transition-colors group">
-                           <td className="px-4 py-3 text-slate-800 font-semibold flex items-center space-x-3">
-                             <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">{String(u.name || 'U').charAt(0).toUpperCase()}</div>
-                             <span className="text-sm">{u.name}</span>
-                           </td>
-                           <td className="px-4 py-3"><span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-[11px] font-bold font-mono">{u.username}</span></td>
-                           <td className="px-4 py-3 text-slate-600 font-medium text-sm">{u.nim || '-'}</td>
-                           <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
-                             <button onClick={() => handleEditUser(u)} className="w-7 h-7 bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Edit Akun"><i className="fas fa-edit text-xs"></i></button>
-                             <button onClick={()=>handleDeleteUser(u.id)} className="w-7 h-7 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Hapus Akun"><i className="fas fa-trash-alt text-xs"></i></button>
-                           </td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeMenu === 'laporan' && user.role === 'admin' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
-                  <h3 className="text-lg font-bold text-slate-800 flex items-center"><i className="fas fa-file-signature mr-2 text-blue-600"></i>Rekapitulasi Kehadiran</h3>
-                  <div className="flex items-center space-x-2.5 w-full md:w-auto justify-end flex-wrap gap-y-2">
-                    <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all h-[38px]" />
-                    <button onClick={handleAddBulkAttendance} className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Tambah Presensi Massal"><i className="fas fa-calendar-plus text-lg"></i></button>
-                    {hasData && currentVerif && (<a href={currentVerif.url} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buka Halaman Verifikasi Resmi"><i className="fas fa-external-link-alt text-lg"></i></a>)}
-                    {hasData && !currentVerif && (<button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buat Link Verifikasi Baru"><i className="fas fa-link text-lg"></i></button>)}
-                    <button onClick={handleDownloadPDF} className="bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Unduh Laporan Format PDF"><i className="fas fa-file-pdf text-lg"></i></button>
-                  </div>
-                </div>
-                <div className="overflow-x-auto p-2">
-                 <table className="w-full text-left border-collapse min-w-[600px]">
-                   <thead>
-                     <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
-                       <th className="px-4 py-3 font-bold">Tanggal</th>
-                       <th className="px-4 py-3 font-bold">Nama Lengkap</th>
-                       <th className="px-4 py-3 font-bold">Jam Masuk</th>
-                       <th className="px-4 py-3 font-bold">Jam Pulang</th>
-                       <th className="px-4 py-3 font-bold text-right">Aksi</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-50">
-                     {filteredAttendanceData.length > 0 ? filteredAttendanceData.sort((a,b) => new Date(b.date) - new Date(a.date)).map(record => {
-                       const u = usersDb.find(user => user.id === record.userId);
-                       if (!u) return null;
-                       return (
-                         <tr key={record.id} className="hover:bg-slate-50/80 transition-colors group">
-                           <td className="px-4 py-3 text-slate-600 font-semibold text-xs">{new Date(record.date).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}</td>
-                           <td className="px-4 py-3 font-semibold text-slate-800 text-sm">{u.name}</td>
-                           <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeIn}</td>
-                           <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeOut || '-'}</td>
-                           <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
-                             <button onClick={() => handleEditAttendance(record)} className="w-7 h-7 bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Edit Presensi"><i className="fas fa-edit text-xs"></i></button>
-                             <button onClick={() => handleDeleteAttendance(record.id)} className="w-7 h-7 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Hapus Presensi"><i className="fas fa-trash-alt text-xs"></i></button>
-                           </td>
-                         </tr>
-                       )
-                     }) : <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-box-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> }
-                   </tbody>
-                 </table>
-               </div>
-             </div>
-          )}
-
-          {activeMenu === 'profil' && user.role === 'admin' && (
-            <div className="bg-white p-4 sm:p-8 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl">
-              <h3 className="text-xl font-bold text-slate-800 mb-8 flex items-center"><div className="bg-blue-50 p-2 rounded-xl mr-3"><i className="fas fa-building text-blue-600"></i></div>Aturan & Profil Instansi</h3>
-              <form onSubmit={async e => { e.preventDefault(); setIsSavingSettings(true); try { await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), settingsDb); setIsSavingSettings(false); Swal.fire('Berhasil', 'Pengaturan instansi diperbarui.', 'success'); } catch (error) { setIsSavingSettings(false); Swal.fire('Error', 'Gagal menyimpan pengaturan', 'error'); } }} className="space-y-6">
-                <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 ml-1">Nama Kegiatan (Opsional)</label>
-                    <input type="text" value={settingsDb.namaKegiatan || ''} onChange={e=>setSettingsDb({...settingsDb, namaKegiatan: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Contoh: KKN / PKL / Pelatihan Dasar"/>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 ml-1">Nama Instansi</label>
-                  <input type="text" required value={settingsDb.namaInstansi} onChange={e=>setSettingsDb({...settingsDb, namaInstansi: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"/>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2 ml-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Titik Koordinat (Pusat GPS)</label>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={String(settingsDb.useLocation).toLowerCase() === 'true'} onChange={e => setSettingsDb({...settingsDb, useLocation: e.target.checked ? 'true' : 'false'})} />
-                      <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-                      <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase">{String(settingsDb.useLocation).toLowerCase() === 'true' ? 'Aktif' : 'Nonaktif'}</span>
-                    </label>
-                  </div>
-                  <div className={`flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 transition-opacity ${String(settingsDb.useLocation).toLowerCase() !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <input type="text" required value={settingsDb.lokasi} onChange={e=>setSettingsDb({...settingsDb, lokasi: e.target.value})} className="flex-1 bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold font-mono text-sm text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Contoh: -6.200000, 106.816666" />
-                    <button type="button" onClick={() => { Swal.fire({title: 'Mencari Lokasi', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); navigator.geolocation.getCurrentPosition(p => { const l=`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`; setSettingsDb({...settingsDb, lokasi: l}); Swal.fire({icon:'success', title:'Lokasi Ditemukan', text:l, timer:1500, showConfirmButton:false}); }, err => Swal.fire('Gagal GPS', err.message, 'error'), {enableHighAccuracy: true}); }} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center whitespace-nowrap text-sm"><i className="fas fa-crosshairs text-blue-600 mr-2"></i> Ambil Titik</button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 border-t border-slate-100 pt-6 mt-6">
-                  <div>
-                    <div className="flex justify-between items-center mb-2 ml-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Batas Jam Masuk</label>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" checked={String(settingsDb.useTime).toLowerCase() === 'true'} onChange={e => setSettingsDb({...settingsDb, useTime: e.target.checked ? 'true' : 'false'})} />
-                        <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-                        <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase">{String(settingsDb.useTime).toLowerCase() === 'true' ? 'Aktif' : 'Nonaktif'}</span>
-                      </label>
-                    </div>
-                    <div className={`transition-opacity ${String(settingsDb.useTime).toLowerCase() !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <input type="time" value={settingsDb.jamMasuk} onChange={e=>setSettingsDb({...settingsDb, jamMasuk: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-bold text-lg text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
-                      <p className="text-[9px] text-slate-400 font-semibold mt-1.5 ml-1 italic">*Lebih dari jam ini status menjadi "Terlambat"</p>
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50"><h3 className="text-base font-bold text-slate-800">Daftar Akun Client</h3></div>
+                    <div className="overflow-x-auto p-2">
+                      <table className="w-full text-left border-collapse min-w-[500px]">
+                         <thead>
+                           <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
+                             <th className="px-4 py-3 font-bold">Nama Lengkap</th>
+                             <th className="px-4 py-3 font-bold">Username</th>
+                             <th className="px-4 py-3 font-bold">NIM</th>
+                             <th className="px-4 py-3 font-bold text-right">Manajemen</th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-50">
+                           {usersDb.filter(u => u.role === 'client').map(u => (
+                             <tr key={u.id} className="hover:bg-slate-50/80 transition-colors group">
+                               <td className="px-4 py-3 text-slate-800 font-semibold flex items-center space-x-3">
+                                 <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">{String(u.name || 'U').charAt(0).toUpperCase()}</div>
+                                 <span className="text-sm">{u.name}</span>
+                               </td>
+                               <td className="px-4 py-3"><span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-[11px] font-bold font-mono">{u.username}</span></td>
+                               <td className="px-4 py-3 text-slate-600 font-medium text-sm">{u.nim || '-'}</td>
+                               <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
+                                 <button onClick={() => handleEditUser(u)} className="w-7 h-7 bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Edit Akun"><i className="fas fa-edit text-xs"></i></button>
+                                 <button onClick={()=>handleDeleteUser(u.id)} className="w-7 h-7 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Hapus Akun"><i className="fas fa-trash-alt text-xs"></i></button>
+                               </td>
+                             </tr>
+                           ))}
+                         </tbody>
+                       </table>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 ml-1">Jam Pulang Default</label>
-                    <input type="time" value={settingsDb.jamPulang} onChange={e=>setSettingsDb({...settingsDb, jamPulang: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-bold text-lg text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
-                  </div>
                 </div>
-                <div className="border-t border-slate-100 pt-6 mt-6">
-                  <h4 className="text-sm font-bold text-slate-800 flex items-center mb-4"><i className="fas fa-map-marked-alt mr-2 text-blue-500"></i> Alamat Lengkap Instansi</h4>
-                  <div className="space-y-4">
-                     <div>
-                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jalan / Detail Alamat</label>
-                       <input type="text" value={settingsDb.alamat || ''} onChange={e=>setSettingsDb({...settingsDb, alamat: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jl. Merdeka No. 10"/>
-                     </div>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Desa / Kecamatan</label>
-                         <input type="text" value={settingsDb.desaKecamatan || ''} onChange={e=>setSettingsDb({...settingsDb, desaKecamatan: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Sumbersari"/>
-                       </div>
-                       <div>
-                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Kota / Kabupaten</label>
-                         <input type="text" value={settingsDb.alamat || ''} onChange={e=>setSettingsDb({...settingsDb, kotaKabupaten: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jember"/>
-                       </div>
-                       <div>
-                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Provinsi / Negara</label>
-                         <input type="text" value={settingsDb.negara || ''} onChange={e=>setSettingsDb({...settingsDb, negara: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jawa Timur, Indonesia"/>
-                       </div>
-                       <div>
-                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Kode Pos</label>
-                         <input type="text" value={settingsDb.kodePos || ''} onChange={e=>setSettingsDb({...settingsDb, kodePos: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: 68121"/>
-                       </div>
-                     </div>
-                  </div>
-                </div>
-                <div className="border-t border-slate-100 pt-6 mt-6">
-                  <h4 className="text-sm font-bold text-slate-800 flex items-center mb-4"><i className="fas fa-link mr-2 text-blue-500"></i> Integrasi Sistem</h4>
-                  <div className="space-y-4">
-                     <div>
-                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Link Website (Akan digunakan untuk QR Verifikasi PDF)</label>
-                       <input type="url" value={settingsDb.appScriptUrl || ''} onChange={e=>setSettingsDb({...settingsDb, appScriptUrl: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: https://username.github.io/presensi"/>
-                       <p className="text-[9px] text-slate-400 font-semibold mt-1.5 ml-1 italic">*Kosongkan jika ingin sistem mendeteksi otomatis URL GitHub Pages Anda.</p>
-                     </div>
-                  </div>
-                </div>
-                <div className="border-t border-slate-100 pt-6 mt-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-sm font-bold text-slate-800 flex items-center"><i className="fas fa-pen-nib mr-2 text-blue-500"></i> Penanggung Jawab Laporan</h4>
-                    <button type="button" onClick={() => { let currentPjs = []; try { currentPjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {} currentPjs.push({jabatan: '', nama: '', nip: ''}); setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(currentPjs)}); }} className="bg-blue-100 text-blue-600 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"><i className="fas fa-plus mr-1"></i> Tambah PJ</button>
-                  </div>
-                  {(() => {
-                    let pjs = []; try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
-                    if (pjs.length === 0) return <p className="text-xs text-slate-400 italic mb-4">Belum ada penanggung jawab. Klik tombol tambah.</p>;
-                    return pjs.map((pj, idx) => (
-                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3 relative group">
-                        <div className="sm:col-span-4">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jabatan</label>
-                          <input type="text" value={pj.jabatan} onChange={e => { const np = [...pjs]; np[idx].jabatan = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Kepala Sekolah" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-normal text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
+              )}
+
+              {activeMenu === 'laporan' && user.role === 'admin' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                      <h3 className="text-lg font-bold text-slate-800 flex items-center"><i className="fas fa-file-signature mr-2 text-blue-600"></i>Rekapitulasi Kehadiran</h3>
+                      <div className="flex items-center space-x-2.5 w-full md:w-auto justify-end flex-wrap gap-y-2">
+                        <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all h-[38px]" />
+                        <button onClick={handleAddBulkAttendance} className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Tambah Presensi Massal"><i className="fas fa-calendar-plus text-lg"></i></button>
+                        {hasData && currentVerif && (<a href={currentVerif.url} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buka Halaman Verifikasi Resmi"><i className="fas fa-external-link-alt text-lg"></i></a>)}
+                        {hasData && !currentVerif && (<button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buat Link Verifikasi Baru"><i className="fas fa-link text-lg"></i></button>)}
+                        <button onClick={handleDownloadPDF} className="bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Unduh Laporan Format PDF"><i className="fas fa-file-pdf text-lg"></i></button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto p-2">
+                     <table className="w-full text-left border-collapse min-w-[600px]">
+                       <thead>
+                         <tr className="text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
+                           <th className="px-4 py-3 font-bold">Tanggal</th>
+                           <th className="px-4 py-3 font-bold">Nama Lengkap</th>
+                           <th className="px-4 py-3 font-bold">Jam Masuk</th>
+                           <th className="px-4 py-3 font-bold">Jam Pulang</th>
+                           <th className="px-4 py-3 font-bold text-right">Aksi</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-50">
+                         {filteredAttendanceData.length > 0 ? filteredAttendanceData.sort((a,b) => new Date(b.date) - new Date(a.date)).map(record => {
+                           const u = usersDb.find(user => user.id === record.userId);
+                           if (!u) return null;
+                           return (
+                             <tr key={record.id} className="hover:bg-slate-50/80 transition-colors group">
+                               <td className="px-4 py-3 text-slate-600 font-semibold text-xs">{new Date(record.date).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}</td>
+                               <td className="px-4 py-3 font-semibold text-slate-800 text-sm">{u.name}</td>
+                               <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeIn}</td>
+                               <td className="px-4 py-3 text-slate-600 font-bold tabular-nums text-sm">{record.timeOut || '-'}</td>
+                               <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
+                                 <button onClick={() => handleEditAttendance(record)} className="w-7 h-7 bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Edit Presensi"><i className="fas fa-edit text-xs"></i></button>
+                                 <button onClick={() => handleDeleteAttendance(record.id)} className="w-7 h-7 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-colors opacity-50 group-hover:opacity-100" title="Hapus Presensi"><i className="fas fa-trash-alt text-xs"></i></button>
+                               </td>
+                             </tr>
+                           )
+                         }) : <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-box-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> }
+                       </tbody>
+                     </table>
+                   </div>
+                 </div>
+              )}
+
+              {activeMenu === 'profil' && user.role === 'admin' && (
+                <div className="bg-white p-4 sm:p-8 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl">
+                  <h3 className="text-xl font-bold text-slate-800 mb-8 flex items-center"><div className="bg-blue-50 p-2 rounded-xl mr-3"><i className="fas fa-building text-blue-600"></i></div>Aturan & Profil Instansi</h3>
+                  <form onSubmit={async e => { e.preventDefault(); setIsSavingSettings(true); try { await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), settingsDb); setIsSavingSettings(false); Swal.fire('Berhasil', 'Pengaturan instansi diperbarui.', 'success'); } catch (error) { setIsSavingSettings(false); Swal.fire('Error', 'Gagal menyimpan pengaturan', 'error'); } }} className="space-y-6">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 ml-1">Nama Kegiatan (Opsional)</label>
+                        <input type="text" value={settingsDb.namaKegiatan || ''} onChange={e=>setSettingsDb({...settingsDb, namaKegiatan: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Contoh: KKN / PKL / Pelatihan Dasar"/>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 ml-1">Nama Instansi</label>
+                      <input type="text" required value={settingsDb.namaInstansi} onChange={e=>setSettingsDb({...settingsDb, namaInstansi: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"/>
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-2 ml-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Titik Koordinat (Pusat GPS)</label>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={String(settingsDb.useLocation).toLowerCase() === 'true'} onChange={e => setSettingsDb({...settingsDb, useLocation: e.target.checked ? 'true' : 'false'})} />
+                          <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                          <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase">{String(settingsDb.useLocation).toLowerCase() === 'true' ? 'Aktif' : 'Nonaktif'}</span>
+                        </label>
+                      </div>
+                      <div className={`flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 transition-opacity ${String(settingsDb.useLocation).toLowerCase() !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <input type="text" required value={settingsDb.lokasi} onChange={e=>setSettingsDb({...settingsDb, lokasi: e.target.value})} className="flex-1 bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold font-mono text-sm text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Contoh: -6.200000, 106.816666" />
+                        <button type="button" onClick={() => { Swal.fire({title: 'Mencari Lokasi', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); navigator.geolocation.getCurrentPosition(p => { const l=`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`; setSettingsDb({...settingsDb, lokasi: l}); Swal.fire({icon:'success', title:'Lokasi Ditemukan', text:l, timer:1500, showConfirmButton:false}); }, err => Swal.fire('Gagal GPS', err.message, 'error'), {enableHighAccuracy: true}); }} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center whitespace-nowrap text-sm"><i className="fas fa-crosshairs text-blue-600 mr-2"></i> Ambil Titik</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 border-t border-slate-100 pt-6 mt-6">
+                      <div>
+                        <div className="flex justify-between items-center mb-2 ml-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Batas Jam Masuk</label>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" className="sr-only peer" checked={String(settingsDb.useTime).toLowerCase() === 'true'} onChange={e => setSettingsDb({...settingsDb, useTime: e.target.checked ? 'true' : 'false'})} />
+                            <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                            <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase">{String(settingsDb.useTime).toLowerCase() === 'true' ? 'Aktif' : 'Nonaktif'}</span>
+                          </label>
                         </div>
-                        <div className="sm:col-span-4">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
-                          <input type="text" value={pj.nama} onChange={e => { const np = [...pjs]; np[idx].nama = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Budi Santoso, M.Pd" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                        <div className={`transition-opacity ${String(settingsDb.useTime).toLowerCase() !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <input type="time" value={settingsDb.jamMasuk} onChange={e=>setSettingsDb({...settingsDb, jamMasuk: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-bold text-lg text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+                          <p className="text-[9px] text-slate-400 font-semibold mt-1.5 ml-1 italic">*Lebih dari jam ini status menjadi "Terlambat"</p>
                         </div>
-                        <div className="sm:col-span-3">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIP / NIM / Kustom</label>
-                          <input type="text" value={pj.nip} onChange={e => { const np = [...pjs]; np[idx].nip = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: NIP. 1980..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
-                        </div>
-                        <div className="sm:col-span-1 flex flex-col justify-end">
-                          <button type="button" onClick={() => { const np = pjs.filter((_, i) => i !== idx); setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}); }} className="w-full h-[38px] bg-red-100 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors flex items-center justify-center"><i className="fas fa-trash-alt"></i></button>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 ml-1">Jam Pulang Default</label>
+                        <input type="time" value={settingsDb.jamPulang} onChange={e=>setSettingsDb({...settingsDb, jamPulang: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-bold text-lg text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+                      </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-6 mt-6">
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center mb-4"><i className="fas fa-map-marked-alt mr-2 text-blue-500"></i> Alamat Lengkap Instansi</h4>
+                      <div className="space-y-4">
+                         <div>
+                           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jalan / Detail Alamat</label>
+                           <input type="text" value={settingsDb.alamat || ''} onChange={e=>setSettingsDb({...settingsDb, alamat: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jl. Merdeka No. 10"/>
+                         </div>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Desa / Kecamatan</label>
+                             <input type="text" value={settingsDb.desaKecamatan || ''} onChange={e=>setSettingsDb({...settingsDb, desaKecamatan: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Sumbersari"/>
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Kota / Kabupaten</label>
+                             <input type="text" value={settingsDb.alamat || ''} onChange={e=>setSettingsDb({...settingsDb, kotaKabupaten: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jember"/>
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Provinsi / Negara</label>
+                             <input type="text" value={settingsDb.negara || ''} onChange={e=>setSettingsDb({...settingsDb, negara: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: Jawa Timur, Indonesia"/>
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Kode Pos</label>
+                             <input type="text" value={settingsDb.kodePos || ''} onChange={e=>setSettingsDb({...settingsDb, kodePos: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: 68121"/>
+                           </div>
+                         </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-6 mt-6">
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center mb-4"><i className="fas fa-link mr-2 text-blue-500"></i> Integrasi Sistem</h4>
+                      <div className="space-y-4">
+                         <div>
+                           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Link Website (Akan digunakan untuk QR Verifikasi PDF)</label>
+                           <input type="url" value={settingsDb.appScriptUrl || ''} onChange={e=>setSettingsDb({...settingsDb, appScriptUrl: e.target.value})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm" placeholder="Cth: https://username.github.io/presensi"/>
+                           <p className="text-[9px] text-slate-400 font-semibold mt-1.5 ml-1 italic">*Kosongkan jika ingin sistem mendeteksi otomatis URL GitHub Pages Anda.</p>
+                         </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-6 mt-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-sm font-bold text-slate-800 flex items-center"><i className="fas fa-pen-nib mr-2 text-blue-500"></i> Penanggung Jawab Laporan</h4>
+                        <button type="button" onClick={() => { let currentPjs = []; try { currentPjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {} currentPjs.push({jabatan: '', nama: '', nip: ''}); setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(currentPjs)}); }} className="bg-blue-100 text-blue-600 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"><i className="fas fa-plus mr-1"></i> Tambah PJ</button>
+                      </div>
+                      {(() => {
+                        let pjs = []; try { pjs = JSON.parse(settingsDb.penanggungJawab || "[]"); } catch(e) {}
+                        if (pjs.length === 0) return <p className="text-xs text-slate-400 italic mb-4">Belum ada penanggung jawab. Klik tombol tambah.</p>;
+                        return pjs.map((pj, idx) => (
+                          <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3 relative group">
+                            <div className="sm:col-span-4">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Jabatan</label>
+                              <input type="text" value={pj.jabatan} onChange={e => { const np = [...pjs]; np[idx].jabatan = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Kepala Sekolah" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-normal text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                            </div>
+                            <div className="sm:col-span-4">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Nama Lengkap</label>
+                              <input type="text" value={pj.nama} onChange={e => { const np = [...pjs]; np[idx].nama = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: Budi Santoso, M.Pd" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                            </div>
+                            <div className="sm:col-span-3">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-1">NIP / NIM / Kustom</label>
+                              <input type="text" value={pj.nip} onChange={e => { const np = [...pjs]; np[idx].nip = e.target.value; setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}) }} placeholder="Cth: NIP. 1980..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                            </div>
+                            <div className="sm:col-span-1 flex flex-col justify-end">
+                              <button type="button" onClick={() => { const np = pjs.filter((_, i) => i !== idx); setSettingsDb({...settingsDb, penanggungJawab: JSON.stringify(np)}); }} className="w-full h-[38px] bg-red-100 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors flex items-center justify-center"><i className="fas fa-trash-alt"></i></button>
                         </div>
                       </div>
                     ));
