@@ -40,7 +40,8 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    // Cukup gunakan signInAnonymously untuk mengamankan Rules Firestore
+    import { getAuth, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
@@ -58,9 +59,8 @@
     
     window.fs = { 
       collection, getDocs, setDoc, doc, deleteDoc, updateDoc,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut 
+      signInAnonymously, signOut 
     };
-    
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
 </head>
@@ -69,9 +69,6 @@
   
   <script type="text/babel" data-presets="react,env">
     const { useState, useEffect, useMemo } = React;
-
-    const INTERNAL_PASS = "PPL2JemberSuperAman123";
-    const convertToEmail = (username) => `${username.trim().toLowerCase()}@presensi.local`;
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
       const R = 6371e3;
@@ -325,7 +322,7 @@
       const [currentTime, setCurrentTime] = useState(new Date());
       const [newUser, setNewUser] = useState({ name: '', username: '', nim: '' });
 
-      // Fungsi modular untuk memuat seluruh ekosistem pangkalan data dari Firestore
+      // Fungsi mengambil data pangkalan Firestore
       const loadAllSystemData = async () => {
         const [usersSnap, attSnap, holSnap, verSnap, setSnap] = await Promise.all([
           window.fs.getDocs(window.fs.collection(window.db, "users")),
@@ -345,9 +342,6 @@
 
         if (u.length === 0) {
           const defaultAdmin = { id: 1, name: 'Administrator', username: 'admin', role: 'admin', nim: 'HRD' };
-          try {
-            await window.fs.createUserWithEmailAndPassword(window.auth, convertToEmail('admin'), INTERNAL_PASS);
-          } catch(authErr) {}
           await window.fs.setDoc(window.fs.doc(window.db, "users", "1"), defaultAdmin);
           u.push(defaultAdmin);
         }
@@ -407,17 +401,18 @@
       useEffect(() => {
         const initData = async () => {
           try {
+            // 1. Cek gerbang otentikasi anonim di awal muat halaman demi keselarasan rules
+            await window.fs.signInAnonymously(window.auth);
+
             let savedUserStr = null;
             try {
               savedUserStr = localStorage.getItem('presensi_user');
             } catch(e) {}
 
-            // JIKA MENEMUKAN SESI LOGIN LAMA, LOGIN KEMBALI SEBELUM MENARIK DATA FIRESTORE
+            // Sesi terdeteksi, langsung muat pangkalan data
             if (savedUserStr) {
                try {
                   const parsed = JSON.parse(savedUserStr);
-                  await window.fs.signInWithEmailAndPassword(window.auth, convertToEmail(parsed.username), INTERNAL_PASS);
-                  
                   const uList = await loadAllSystemData();
                   const validUser = uList.find(user => user.username.toLowerCase() === parsed.username.toLowerCase());
                   
@@ -428,12 +423,18 @@
                       try { localStorage.removeItem('presensi_user'); } catch(e) {}
                   }
                } catch(e) {
-                  console.error("Auto login gagal", e);
-                  try { localStorage.removeItem('presensi_user'); } catch(err) {}
+                  console.error("Gagal melakukan sinkronisasi otomatis data.", e);
                }
             } else {
-               // Jika tidak ada user login, set instansi teks pembuka default agar UI form tidak blank
-               setSettingsDb(prev => ({...prev, namaInstansi: "Sistem Presensi PPL 2"}));
+               // Tarik data nama instansi di awal agar UI tidak menampilkan 'Memuat...' saat login
+               const setSnap = await window.fs.getDocs(window.fs.collection(window.db, "settings"));
+               let s = {};
+               setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
+               if(s.namaInstansi) {
+                 setSettingsDb(prev => ({ ...prev, namaInstansi: s.namaInstansi }));
+               } else {
+                 setSettingsDb(prev => ({ ...prev, namaInstansi: "Sistem Presensi PPL 2" }));
+               }
             }
             
             setIsLoading(false);
@@ -471,12 +472,7 @@
         });
 
         try {
-          const fakeEmail = convertToEmail(username);
-          
-          // 1. Jalankan proses otentikasi aman terlebih dahulu di latar belakang
-          await window.fs.signInWithEmailAndPassword(window.auth, fakeEmail, INTERNAL_PASS);
-          
-          // 2. Jika token auth sah, barulah sistem diizinkan mengambil data database
+          // Token anonim sudah aktif, kita bisa langsung membaca koleksi users secara dinamis dan fleksibel
           const uList = await loadAllSystemData();
           const found = uList.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
           
@@ -486,11 +482,11 @@
             try { localStorage.setItem('presensi_user', JSON.stringify(found)); } catch(e) {}
             Swal.fire({ icon: 'success', title: 'Berhasil!', text: `Selamat datang, ${found.name}`, timer: 1200, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } }).then(() => changeMenu('dashboard'));
           } else {
-            Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Data profil user tidak ditemukan di Firestore.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Username tidak terdaftar.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
         } catch(e) {
           console.error(e);
-          Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Username tidak terdaftar atau koneksi terputus.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          Swal.fire({ icon: 'error', title: 'Koneksi Gagal', text: 'Periksa internet Anda.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
         }
       };
 
@@ -504,12 +500,11 @@
           confirmButtonText: 'Ya, Keluar',
           cancelButtonText: 'Batal',
           customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        }).then(async (result) => {
+        }).then((result) => {
           if (result.isConfirmed) {
+            setUser(null);
+            setIsDataReady(false);
             try {
-              await window.fs.signOut(window.auth);
-              setUser(null);
-              setIsDataReady(false);
               localStorage.removeItem('presensi_user'); 
               localStorage.removeItem('presensi_menu'); 
             } catch(e) {}
@@ -520,31 +515,12 @@
       const handleAddUser = async (e) => {
         e.preventDefault();
         if(!newUser.name || !newUser.username) return;
+        const added = { ...newUser, id: Date.now(), role: 'client' };
         
-        Swal.fire({
-          html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Mendaftarkan Kredensial...</p></div>',
-          allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        });
-
-        try {
-          const fakeEmail = convertToEmail(newUser.username);
-          
-          try {
-            await window.fs.createUserWithEmailAndPassword(window.auth, fakeEmail, INTERNAL_PASS);
-          } catch(authErr) {
-            if (authErr.code !== 'auth/email-already-in-use') throw authErr;
-          }
-
-          const added = { ...newUser, id: Date.now(), role: 'client' };
-          await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
-          
-          setUsersDb(prev => [...prev, added]);
-          setNewUser({ name: '', username: '', nim: '' });
-          Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data client berhasil ditambahkan.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
-        } catch(err) {
-          console.error(err);
-          Swal.fire('Gagal', 'Gagal mendaftarkan sistem keamanan user baru: ' + err.message, 'error');
-        }
+        await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
+        setUsersDb(prev => [...prev, added]);
+        setNewUser({ name: '', username: '', nim: '' });
+        Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data client berhasil ditambahkan.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
       };
 
       const handleEditUser = (clientObj) => {
@@ -556,9 +532,9 @@
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nama Lengkap</label>
                 <input type="text" id="swal-n" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.name}">
               </div>
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 opacity-60">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Username Login (Tidak Dapat Diubah)</label>
-                <input type="text" id="swal-u" readonly class="w-full bg-transparent outline-none font-semibold text-slate-505 text-sm" value="${clientObj.username}">
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Username Login</label>
+                <input type="text" id="swal-u" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.username}">
               </div>
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">NIM</label>
@@ -580,6 +556,7 @@
             return {
               ...clientObj,
               name: document.getElementById('swal-n').value,
+              username: document.getElementById('swal-u').value,
               nim: document.getElementById('swal-nim').value
             }
           }
@@ -594,7 +571,7 @@
 
       const handleDeleteUser = (id) => {
         Swal.fire({
-          title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan dari Firestore!", icon: 'warning',
+          title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan!", icon: 'warning',
           showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
         }).then(async (result) => {
           if (result.isConfirmed) {
@@ -706,7 +683,7 @@
             const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
             setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
 
-            Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi berhasil dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           
           } else {
             const activeRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr && a.status !== 'Menunggu');
@@ -932,7 +909,7 @@
                           isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
                        }
                        if (data.section === 'head') {
-                         data.cell.styles.fillColor = [255, 255, 255]; 
+                         doc.cell.styles.fillColor = [255, 255, 255]; 
                          data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
                        }
                        if (data.section === 'body') {
