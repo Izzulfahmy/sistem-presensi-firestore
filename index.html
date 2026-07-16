@@ -40,7 +40,6 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    // Menyisipkan modul Autentikasi Utama
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -55,7 +54,7 @@
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
-    window.auth = getAuth(app); // Inisialisasi Auth global untuk dipanggil di komponen React
+    window.auth = getAuth(app);
     
     window.fs = { 
       collection, getDocs, setDoc, doc, deleteDoc, updateDoc,
@@ -71,7 +70,6 @@
   <script type="text/babel" data-presets="react,env">
     const { useState, useEffect, useMemo } = React;
 
-    // Default password internal untuk mempermudah alur tanpa mengubah UI login input
     const INTERNAL_PASS = "PPL2JemberSuperAman123";
     const convertToEmail = (username) => `${username.trim().toLowerCase()}@presensi.local`;
 
@@ -327,109 +325,117 @@
       const [currentTime, setCurrentTime] = useState(new Date());
       const [newUser, setNewUser] = useState({ name: '', username: '', nim: '' });
 
+      // Fungsi modular untuk memuat seluruh ekosistem pangkalan data dari Firestore
+      const loadAllSystemData = async () => {
+        const [usersSnap, attSnap, holSnap, verSnap, setSnap] = await Promise.all([
+          window.fs.getDocs(window.fs.collection(window.db, "users")),
+          window.fs.getDocs(window.fs.collection(window.db, "attendance")),
+          window.fs.getDocs(window.fs.collection(window.db, "holidays")),
+          window.fs.getDocs(window.fs.collection(window.db, "verifications")),
+          window.fs.getDocs(window.fs.collection(window.db, "settings"))
+        ]);
+
+        let u = usersSnap.docs.map(d => d.data());
+        let a = attSnap.docs.map(d => d.data());
+        let h = holSnap.docs.map(d => d.data());
+        let v = verSnap.docs.map(d => d.data());
+        
+        let s = {};
+        setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
+
+        if (u.length === 0) {
+          const defaultAdmin = { id: 1, name: 'Administrator', username: 'admin', role: 'admin', nim: 'HRD' };
+          try {
+            await window.fs.createUserWithEmailAndPassword(window.auth, convertToEmail('admin'), INTERNAL_PASS);
+          } catch(authErr) {}
+          await window.fs.setDoc(window.fs.doc(window.db, "users", "1"), defaultAdmin);
+          u.push(defaultAdmin);
+        }
+
+        if(Object.keys(s).length === 0) {
+          s = { namaInstansi: 'Sistem Presensi Default', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', useLocation: 'false', useTime: 'true' };
+          await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), s);
+        }
+
+        let pM = s.jamMasuk, pP = s.jamPulang;
+        const fix = (t) => { if(!t) return null; const m = String(t).replace(/\./g, ':').match(/(\d{1,2}):(\d{2})/); return m ? `${m[1].padStart(2, '0')}:${m[2]}` : t; };
+        
+        const finalSettings = { 
+          ...settingsDb, 
+          ...s, 
+          jamMasuk: fix(pM) || '08:00', 
+          jamPulang: fix(pP) || '17:00',
+          useLocation: s.hasOwnProperty('useLocation') ? String(s.useLocation).toLowerCase() : 'true',
+          useTime: s.hasOwnProperty('useTime') ? String(s.useTime).toLowerCase() : 'true',
+        };
+
+        const now = new Date();
+        const currentYYYYMMDD = getLocalYYYYMMDD(now);
+        const currentHm = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+        
+        let processedAtt = a.map(record => {
+            if (record.status === 'Menunggu') {
+                let shouldBeAlpa = false;
+                if (record.date < currentYYYYMMDD) {
+                    shouldBeAlpa = true;
+                } else if (record.date === currentYYYYMMDD) {
+                    const pH = parseInt((finalSettings.jamPulang || '17:00').split(':')[0]);
+                    const pMin = parseInt((finalSettings.jamPulang || '17:00').split(':')[1]);
+                    const cH = parseInt(currentHm.split(':')[0]);
+                    const cMin = parseInt(currentHm.split(':')[1]);
+                    
+                    if (cH > pH || (cH === pH && cMin >= pMin)) {
+                        shouldBeAlpa = true;
+                    }
+                }
+                if (shouldBeAlpa) {
+                    window.fs.updateDoc(window.fs.doc(window.db, "attendance", record.id.toString()), { status: 'Alpa' }).catch(console.error);
+                    return { ...record, status: 'Alpa' };
+                }
+            }
+            return record;
+        });
+
+        setSettingsDb(finalSettings);
+        setUsersDb(u);
+        setHolidaysDb(h);
+        setVerificationsDb(v);
+        setAttendanceDb(processedAtt);
+        return u;
+      };
+
       useEffect(() => {
         const initData = async () => {
           try {
-            const [usersSnap, attSnap, holSnap, verSnap, setSnap] = await Promise.all([
-              window.fs.getDocs(window.fs.collection(window.db, "users")),
-              window.fs.getDocs(window.fs.collection(window.db, "attendance")),
-              window.fs.getDocs(window.fs.collection(window.db, "holidays")),
-              window.fs.getDocs(window.fs.collection(window.db, "verifications")),
-              window.fs.getDocs(window.fs.collection(window.db, "settings"))
-            ]);
-
-            let u = usersSnap.docs.map(d => d.data());
-            let a = attSnap.docs.map(d => d.data());
-            let h = holSnap.docs.map(d => d.data());
-            let v = verSnap.docs.map(d => d.data());
-            
-            let s = {};
-            setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
-
-            if (u.length === 0) {
-              const defaultAdmin = { id: 1, name: 'Administrator', username: 'admin', role: 'admin', nim: 'HRD' };
-              
-              // 1. Daftarkan Admin Utama secara otomatis ke Firebase Auth
-              try {
-                await window.fs.createUserWithEmailAndPassword(window.auth, convertToEmail('admin'), INTERNAL_PASS);
-              } catch(authErr) {
-                // Lewati jika admin sudah terdaftar di auth
-              }
-
-              await window.fs.setDoc(window.fs.doc(window.db, "users", "1"), defaultAdmin);
-              u.push(defaultAdmin);
-            }
-
-            if(Object.keys(s).length === 0) {
-              s = { namaInstansi: 'Sistem Presensi Default', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', useLocation: 'false', useTime: 'true' };
-              await window.fs.setDoc(window.fs.doc(window.db, "settings", "config"), s);
-            }
-
-            let pM = s.jamMasuk, pP = s.jamPulang;
-            const fix = (t) => { if(!t) return null; const m = String(t).replace(/\./g, ':').match(/(\d{1,2}):(\d{2})/); return m ? `${m[1].padStart(2, '0')}:${m[2]}` : t; };
-            
-            const finalSettings = { 
-              ...settingsDb, 
-              ...s, 
-              jamMasuk: fix(pM) || '08:00', 
-              jamPulang: fix(pP) || '17:00',
-              useLocation: s.hasOwnProperty('useLocation') ? String(s.useLocation).toLowerCase() : 'true',
-              useTime: s.hasOwnProperty('useTime') ? String(s.useTime).toLowerCase() : 'true',
-            };
-
-            const now = new Date();
-            const currentYYYYMMDD = getLocalYYYYMMDD(now);
-            const currentHm = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
-            
-            let processedAtt = a.map(record => {
-                if (record.status === 'Menunggu') {
-                    let shouldBeAlpa = false;
-                    if (record.date < currentYYYYMMDD) {
-                        shouldBeAlpa = true;
-                    } else if (record.date === currentYYYYMMDD) {
-                        const pH = parseInt((finalSettings.jamPulang || '17:00').split(':')[0]);
-                        const pMin = parseInt((finalSettings.jamPulang || '17:00').split(':')[1]);
-                        const cH = parseInt(currentHm.split(':')[0]);
-                        const cMin = parseInt(currentHm.split(':')[1]);
-                        
-                        if (cH > pH || (cH === pH && cMin >= pMin)) {
-                            shouldBeAlpa = true;
-                        }
-                    }
-                    if (shouldBeAlpa) {
-                        window.fs.updateDoc(window.fs.doc(window.db, "attendance", record.id.toString()), { status: 'Alpa' }).catch(console.error);
-                        return { ...record, status: 'Alpa' };
-                    }
-                }
-                return record;
-            });
-
-            setSettingsDb(finalSettings);
-            setUsersDb(u);
-            setHolidaysDb(h);
-            setVerificationsDb(v);
-            setAttendanceDb(processedAtt);
-            
             let savedUserStr = null;
             try {
               savedUserStr = localStorage.getItem('presensi_user');
             } catch(e) {}
 
+            // JIKA MENEMUKAN SESI LOGIN LAMA, LOGIN KEMBALI SEBELUM MENARIK DATA FIRESTORE
             if (savedUserStr) {
                try {
                   const parsed = JSON.parse(savedUserStr);
-                  const validUser = u.find(user => user.username === parsed.username);
+                  await window.fs.signInWithEmailAndPassword(window.auth, convertToEmail(parsed.username), INTERNAL_PASS);
+                  
+                  const uList = await loadAllSystemData();
+                  const validUser = uList.find(user => user.username.toLowerCase() === parsed.username.toLowerCase());
+                  
                   if(validUser){
-                      // Lakukan auto-login re-auth Firebase di latar belakang agar token tetap valid
-                      await window.fs.signInWithEmailAndPassword(window.auth, convertToEmail(validUser.username), INTERNAL_PASS);
                       setUser(validUser);
+                      setIsDataReady(true);
                   } else {
                       try { localStorage.removeItem('presensi_user'); } catch(e) {}
                   }
-               } catch(e) {}
+               } catch(e) {
+                  console.error("Auto login gagal", e);
+                  try { localStorage.removeItem('presensi_user'); } catch(err) {}
+               }
+            } else {
+               // Jika tidak ada user login, set instansi teks pembuka default agar UI form tidak blank
+               setSettingsDb(prev => ({...prev, namaInstansi: "Sistem Presensi PPL 2"}));
             }
             
-            setIsDataReady(true);
             setIsLoading(false);
           } catch (error) {
             console.error(error);
@@ -467,16 +473,16 @@
         try {
           const fakeEmail = convertToEmail(username);
           
-          // 2. Autentikasi lewat Firebase Auth resmi di latar belakang
+          // 1. Jalankan proses otentikasi aman terlebih dahulu di latar belakang
           await window.fs.signInWithEmailAndPassword(window.auth, fakeEmail, INTERNAL_PASS);
           
-          const usersSnap = await window.fs.getDocs(window.fs.collection(window.db, "users"));
-          const currentUsers = usersSnap.docs.map(d => d.data());
-          const found = currentUsers.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+          // 2. Jika token auth sah, barulah sistem diizinkan mengambil data database
+          const uList = await loadAllSystemData();
+          const found = uList.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
           
           if (found) {
-            setUsersDb(currentUsers);
             setUser(found);
+            setIsDataReady(true);
             try { localStorage.setItem('presensi_user', JSON.stringify(found)); } catch(e) {}
             Swal.fire({ icon: 'success', title: 'Berhasil!', text: `Selamat datang, ${found.name}`, timer: 1200, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } }).then(() => changeMenu('dashboard'));
           } else {
@@ -501,9 +507,9 @@
         }).then(async (result) => {
           if (result.isConfirmed) {
             try {
-              // Logout dari Firebase Auth Session
               await window.fs.signOut(window.auth);
               setUser(null);
+              setIsDataReady(false);
               localStorage.removeItem('presensi_user'); 
               localStorage.removeItem('presensi_menu'); 
             } catch(e) {}
@@ -523,7 +529,6 @@
         try {
           const fakeEmail = convertToEmail(newUser.username);
           
-          // 3. Daftarkan username baru secara aman ke Firebase Auth saat Admin membuat client
           try {
             await window.fs.createUserWithEmailAndPassword(window.auth, fakeEmail, INTERNAL_PASS);
           } catch(authErr) {
@@ -553,7 +558,7 @@
               </div>
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 opacity-60">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Username Login (Tidak Dapat Diubah)</label>
-                <input type="text" id="swal-u" readonly class="w-full bg-transparent outline-none font-semibold text-slate-500 text-sm" value="${clientObj.username}">
+                <input type="text" id="swal-u" readonly class="w-full bg-transparent outline-none font-semibold text-slate-505 text-sm" value="${clientObj.username}">
               </div>
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">NIM</label>
@@ -701,7 +706,7 @@
             const filteredDb = attendanceDb.filter(a => a.id !== (existingUserRec ? existingUserRec.id : null));
             setAttendanceDb([...filteredDb, updatedRec, ...newPlaceholders]);
 
-            Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            Swal.fire({ icon: 'success', title: 'Berhasil Masuk', text: `Presensi berhasil dicatat pukul ${time}`, timer: 2000, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           
           } else {
             const activeRec = attendanceDb.find(a => a.userId === user.id && a.date === todayStr && a.status !== 'Menunggu');
@@ -999,7 +1004,7 @@
                      doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
                   });
 
-                  const deletePDF = () => {
+                  const savePDF = () => {
                      doc.save(`Rekap_Presensi_${monthName.replace(' ', '_')}.pdf`);
                      Swal.close();
                   };
@@ -1015,12 +1020,12 @@
                          ctx.drawImage(img, 0, 0);
                          const dataURL = canvas.toDataURL('image/png');
                          doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
-                         deletePDF();
+                         savePDF();
                      };
-                     img.onerror = () => deletePDF();
+                     img.onerror = () => savePDF();
                      img.src = qrUrl;
                   } else {
-                     deletePDF(); 
+                     savePDF(); 
                   }
                 } catch (error) {
                   console.error(error);
