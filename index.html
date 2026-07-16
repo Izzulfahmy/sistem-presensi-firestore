@@ -40,7 +40,6 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    // Cukup gunakan signInAnonymously untuk mengamankan Rules Firestore
     import { getAuth, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -287,6 +286,9 @@
       const [isLocating, setIsLocating] = useState(false); 
       const [isSavingSettings, setIsSavingSettings] = useState(false); 
       
+      const [isSystemEmpty, setIsSystemEmpty] = useState(false); // Deteksi jika database belum ada user
+      const [regForm, setRegForm] = useState({ name: '', username: '', nim: '' }); // Form khusus registrasi admin pertama
+
       const [user, setUser] = useState(() => {
         try {
           const savedUser = localStorage.getItem('presensi_user');
@@ -322,7 +324,6 @@
       const [currentTime, setCurrentTime] = useState(new Date());
       const [newUser, setNewUser] = useState({ name: '', username: '', nim: '' });
 
-      // Fungsi mengambil data pangkalan Firestore
       const loadAllSystemData = async () => {
         const [usersSnap, attSnap, holSnap, verSnap, setSnap] = await Promise.all([
           window.fs.getDocs(window.fs.collection(window.db, "users")),
@@ -339,12 +340,6 @@
         
         let s = {};
         setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
-
-        if (u.length === 0) {
-          const defaultAdmin = { id: 1, name: 'Administrator', username: 'admin', role: 'admin', nim: 'HRD' };
-          await window.fs.setDoc(window.fs.doc(window.db, "users", "1"), defaultAdmin);
-          u.push(defaultAdmin);
-        }
 
         if(Object.keys(s).length === 0) {
           s = { namaInstansi: 'Sistem Presensi Default', jamMasuk: '08:00', jamPulang: '17:00', liburMinggu: 'true', liburSabtu: 'false', useLocation: 'false', useTime: 'true' };
@@ -401,17 +396,23 @@
       useEffect(() => {
         const initData = async () => {
           try {
-            // 1. Cek gerbang otentikasi anonim di awal muat halaman demi keselarasan rules
+            // Aktifkan gerbang token aman Firestore via Anonim Auth
             await window.fs.signInAnonymously(window.auth);
 
-            let savedUserStr = null;
-            try {
-              savedUserStr = localStorage.getItem('presensi_user');
-            } catch(e) {}
+            // Ambil daftar users untuk mengecek apakah pangkalan data kosong
+            const usersSnap = await window.fs.getDocs(window.fs.collection(window.db, "users"));
+            
+            if (usersSnap.empty) {
+               // JIKA KOSONG: Aktifkan mode register utama
+               setIsSystemEmpty(true);
+               setSettingsDb(prev => ({ ...prev, namaInstansi: "Setup Sistem Baru" }));
+            } else {
+               // JIKA ADA DATA: Jalankan alur seperti biasa
+               setIsSystemEmpty(false);
+               let savedUserStr = null;
+               try { savedUserStr = localStorage.getItem('presensi_user'); } catch(e) {}
 
-            // Sesi terdeteksi, langsung muat pangkalan data
-            if (savedUserStr) {
-               try {
+               if (savedUserStr) {
                   const parsed = JSON.parse(savedUserStr);
                   const uList = await loadAllSystemData();
                   const validUser = uList.find(user => user.username.toLowerCase() === parsed.username.toLowerCase());
@@ -422,18 +423,11 @@
                   } else {
                       try { localStorage.removeItem('presensi_user'); } catch(e) {}
                   }
-               } catch(e) {
-                  console.error("Gagal melakukan sinkronisasi otomatis data.", e);
-               }
-            } else {
-               // Tarik data nama instansi di awal agar UI tidak menampilkan 'Memuat...' saat login
-               const setSnap = await window.fs.getDocs(window.fs.collection(window.db, "settings"));
-               let s = {};
-               setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
-               if(s.namaInstansi) {
-                 setSettingsDb(prev => ({ ...prev, namaInstansi: s.namaInstansi }));
                } else {
-                 setSettingsDb(prev => ({ ...prev, namaInstansi: "Sistem Presensi PPL 2" }));
+                  const setSnap = await window.fs.getDocs(window.fs.collection(window.db, "settings"));
+                  let s = {};
+                  setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
+                  setSettingsDb(prev => ({ ...prev, namaInstansi: s.namaInstansi || "Sistem Presensi PPL 2" }));
                }
             }
             
@@ -472,7 +466,6 @@
         });
 
         try {
-          // Token anonim sudah aktif, kita bisa langsung membaca koleksi users secara dinamis dan fleksibel
           const uList = await loadAllSystemData();
           const found = uList.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
           
@@ -487,6 +480,44 @@
         } catch(e) {
           console.error(e);
           Swal.fire({ icon: 'error', title: 'Koneksi Gagal', text: 'Periksa internet Anda.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+        }
+      };
+
+      // Fungsi khusus untuk pendaftaran pertama kali (Dinamis dari Web UI)
+      const handleRegisterAdmin = async (e) => {
+        e.preventDefault();
+        if(!regForm.name || !regForm.username) return;
+
+        Swal.fire({
+          html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Membangun Akun Utama...</p></div>',
+          allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
+        });
+
+        try {
+          const mainAdmin = {
+            id: Date.now(),
+            name: regForm.name.trim(),
+            username: regForm.username.trim().toLowerCase(),
+            role: 'admin',
+            nim: regForm.nim.trim() || 'ROOT-HRD'
+          };
+
+          // Tembak data langsung ke Firestore
+          await window.fs.setDoc(window.fs.doc(window.db, "users", mainAdmin.id.toString()), mainAdmin);
+          
+          Swal.fire({
+            icon: 'success',
+            title: 'Sistem Amankan!',
+            text: 'Akun Admin Utama berhasil dibuat. Memuat ulang sistem...',
+            timer: 2000,
+            showConfirmButton: false,
+            customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
+          }).then(() => {
+             window.location.reload();
+          });
+        } catch(err) {
+          console.error(err);
+          Swal.fire('Gagal Setup', 'Terjadi kesalahan: ' + err.message, 'error');
         }
       };
 
@@ -909,7 +940,7 @@
                           isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
                        }
                        if (data.section === 'head') {
-                         doc.cell.styles.fillColor = [255, 255, 255]; 
+                         data.cell.styles.fillColor = [255, 255, 255]; 
                          data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
                        }
                        if (data.section === 'body') {
@@ -1046,6 +1077,37 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
+      // GUARD SCREEN 1: BILA DATABASE KOSONG, TAMPILKAN REGISTER UTAMA
+      if (isSystemEmpty) return (
+        <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
+          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 relative z-10">
+            <div className="text-center mb-6">
+              <div className="bg-emerald-600 w-16 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-100">
+                <i className="fas fa-shield-alt text-white text-2xl"></i>
+              </div>
+              <h1 className="text-xl font-bold text-slate-800 tracking-tight">Pendaftaran Admin Utama</h1>
+              <p className="text-slate-400 mt-1 text-xs font-semibold">Sistem baru terdeteksi. Silakan daftarkan akun Admin Utama Anda.</p>
+            </div>
+            <form onSubmit={handleRegisterAdmin} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">Nama Lengkap Admin</label>
+                <input type="text" required value={regForm.name} onChange={e=>setRegForm({...regForm, name:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-700 text-sm" placeholder="Contoh: Fahmi Professional" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">Username Login Admin</label>
+                <input type="text" required value={regForm.username} onChange={e=>setRegForm({...regForm, username:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-bold text-slate-700 text-sm" placeholder="Contoh: masteradmin" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 ml-1">NIM / Kode Penanda (Opsional)</label>
+                <input type="text" value={regForm.nim} onChange={e=>setRegForm({...regForm, nim:e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-700 text-sm" placeholder="Contoh: 123456" />
+              </div>
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm mt-2">Daftar & Amankan Sistem</button>
+            </form>
+          </div>
+        </div>
+      );
+
+      // GUARD SCREEN 2: JIKA SUDAH ADA USER, TAMPILKAN LOGIN SEPERTI BIASA
       if (!user) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
@@ -1067,6 +1129,7 @@
         </div>
       );
 
+      // GUARD SCREEN 3: LOADING SYNCING DASHBOARD
       if (!isDataReady) return (
         <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
           <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
