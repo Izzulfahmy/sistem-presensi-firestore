@@ -28,6 +28,8 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    // Mengimpor modul Auth & SignIn Anonymous
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
@@ -41,7 +43,13 @@
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
-    window.fs = { collection, getDocs };
+    window.auth = getAuth(app);
+    
+    window.fs = { 
+      collection, 
+      getDocs,
+      signInAnonymously // Didaftarkan ke window agar bisa diakses di React
+    };
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
 </head>
@@ -90,6 +98,10 @@
       useEffect(() => {
         const initData = async () => {
           try {
+            // 1. Lakukan Autentikasi Anonim di latar belakang sebelum mengambil data
+            await window.fs.signInAnonymously(window.auth);
+
+            // 2. Jika sukses bypass auth token, ambil data seperti biasa
             const [usersSnap, attSnap, holSnap, setSnap] = await Promise.all([
               window.fs.getDocs(window.fs.collection(window.db, "users")),
               window.fs.getDocs(window.fs.collection(window.db, "attendance")),

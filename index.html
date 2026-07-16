@@ -40,6 +40,8 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    // Menyisipkan modul Autentikasi Utama
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAfkqKKgX5WqFMZ-wUI0RIjmZyahrD1uWg",
@@ -53,7 +55,13 @@
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
-    window.fs = { collection, getDocs, setDoc, doc, deleteDoc, updateDoc };
+    window.auth = getAuth(app); // Inisialisasi Auth global untuk dipanggil di komponen React
+    
+    window.fs = { 
+      collection, getDocs, setDoc, doc, deleteDoc, updateDoc,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut 
+    };
+    
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
 </head>
@@ -62,6 +70,10 @@
   
   <script type="text/babel" data-presets="react,env">
     const { useState, useEffect, useMemo } = React;
+
+    // Default password internal untuk mempermudah alur tanpa mengubah UI login input
+    const INTERNAL_PASS = "PPL2JemberSuperAman123";
+    const convertToEmail = (username) => `${username.trim().toLowerCase()}@presensi.local`;
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
       const R = 6371e3;
@@ -280,7 +292,6 @@
       const [isLocating, setIsLocating] = useState(false); 
       const [isSavingSettings, setIsSavingSettings] = useState(false); 
       
-      // Mengamankan akses localStorage
       const [user, setUser] = useState(() => {
         try {
           const savedUser = localStorage.getItem('presensi_user');
@@ -290,7 +301,6 @@
         }
       }); 
       
-      // Mengamankan akses localStorage
       const [activeMenu, setActiveMenu] = useState(() => {
         try {
           return localStorage.getItem('presensi_menu') || 'dashboard';
@@ -338,6 +348,14 @@
 
             if (u.length === 0) {
               const defaultAdmin = { id: 1, name: 'Administrator', username: 'admin', role: 'admin', nim: 'HRD' };
+              
+              // 1. Daftarkan Admin Utama secara otomatis ke Firebase Auth
+              try {
+                await window.fs.createUserWithEmailAndPassword(window.auth, convertToEmail('admin'), INTERNAL_PASS);
+              } catch(authErr) {
+                // Lewati jika admin sudah terdaftar di auth
+              }
+
               await window.fs.setDoc(window.fs.doc(window.db, "users", "1"), defaultAdmin);
               u.push(defaultAdmin);
             }
@@ -392,7 +410,6 @@
             setVerificationsDb(v);
             setAttendanceDb(processedAtt);
             
-            // Mengamankan akses localStorage
             let savedUserStr = null;
             try {
               savedUserStr = localStorage.getItem('presensi_user');
@@ -403,6 +420,8 @@
                   const parsed = JSON.parse(savedUserStr);
                   const validUser = u.find(user => user.username === parsed.username);
                   if(validUser){
+                      // Lakukan auto-login re-auth Firebase di latar belakang agar token tetap valid
+                      await window.fs.signInWithEmailAndPassword(window.auth, convertToEmail(validUser.username), INTERNAL_PASS);
                       setUser(validUser);
                   } else {
                       try { localStorage.removeItem('presensi_user'); } catch(e) {}
@@ -446,9 +465,14 @@
         });
 
         try {
+          const fakeEmail = convertToEmail(username);
+          
+          // 2. Autentikasi lewat Firebase Auth resmi di latar belakang
+          await window.fs.signInWithEmailAndPassword(window.auth, fakeEmail, INTERNAL_PASS);
+          
           const usersSnap = await window.fs.getDocs(window.fs.collection(window.db, "users"));
           const currentUsers = usersSnap.docs.map(d => d.data());
-          const found = currentUsers.find(u => u.username === username);
+          const found = currentUsers.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
           
           if (found) {
             setUsersDb(currentUsers);
@@ -456,10 +480,11 @@
             try { localStorage.setItem('presensi_user', JSON.stringify(found)); } catch(e) {}
             Swal.fire({ icon: 'success', title: 'Berhasil!', text: `Selamat datang, ${found.name}`, timer: 1200, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } }).then(() => changeMenu('dashboard'));
           } else {
-            Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Username tidak terdaftar.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+            Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Data profil user tidak ditemukan di Firestore.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
           }
         } catch(e) {
-          Swal.fire({ icon: 'error', title: 'Koneksi Gagal', text: 'Periksa internet Anda.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          console.error(e);
+          Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Username tidak terdaftar atau koneksi terputus.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
         }
       };
 
@@ -473,10 +498,12 @@
           confirmButtonText: 'Ya, Keluar',
           cancelButtonText: 'Batal',
           customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
-        }).then((result) => {
+        }).then(async (result) => {
           if (result.isConfirmed) {
-            setUser(null);
             try {
+              // Logout dari Firebase Auth Session
+              await window.fs.signOut(window.auth);
+              setUser(null);
               localStorage.removeItem('presensi_user'); 
               localStorage.removeItem('presensi_menu'); 
             } catch(e) {}
@@ -487,12 +514,32 @@
       const handleAddUser = async (e) => {
         e.preventDefault();
         if(!newUser.name || !newUser.username) return;
-        const added = { ...newUser, id: Date.now(), role: 'client' };
         
-        await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
-        setUsersDb(prev => [...prev, added]);
-        setNewUser({ name: '', username: '', nim: '' });
-        Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data client berhasil ditambahkan.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+        Swal.fire({
+          html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Mendaftarkan Kredensial...</p></div>',
+          allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
+        });
+
+        try {
+          const fakeEmail = convertToEmail(newUser.username);
+          
+          // 3. Daftarkan username baru secara aman ke Firebase Auth saat Admin membuat client
+          try {
+            await window.fs.createUserWithEmailAndPassword(window.auth, fakeEmail, INTERNAL_PASS);
+          } catch(authErr) {
+            if (authErr.code !== 'auth/email-already-in-use') throw authErr;
+          }
+
+          const added = { ...newUser, id: Date.now(), role: 'client' };
+          await window.fs.setDoc(window.fs.doc(window.db, "users", added.id.toString()), added);
+          
+          setUsersDb(prev => [...prev, added]);
+          setNewUser({ name: '', username: '', nim: '' });
+          Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data client berhasil ditambahkan.', timer: 1500, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+        } catch(err) {
+          console.error(err);
+          Swal.fire('Gagal', 'Gagal mendaftarkan sistem keamanan user baru: ' + err.message, 'error');
+        }
       };
 
       const handleEditUser = (clientObj) => {
@@ -504,9 +551,9 @@
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nama Lengkap</label>
                 <input type="text" id="swal-n" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.name}">
               </div>
-              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Username Login</label>
-                <input type="text" id="swal-u" class="w-full bg-transparent outline-none font-semibold text-slate-700 text-sm" value="${clientObj.username}">
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 opacity-60">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Username Login (Tidak Dapat Diubah)</label>
+                <input type="text" id="swal-u" readonly class="w-full bg-transparent outline-none font-semibold text-slate-500 text-sm" value="${clientObj.username}">
               </div>
               <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">NIM</label>
@@ -528,7 +575,6 @@
             return {
               ...clientObj,
               name: document.getElementById('swal-n').value,
-              username: document.getElementById('swal-u').value,
               nim: document.getElementById('swal-nim').value
             }
           }
@@ -543,7 +589,7 @@
 
       const handleDeleteUser = (id) => {
         Swal.fire({
-          title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan!", icon: 'warning',
+          title: 'Hapus Client?', text: "Data client tidak dapat dikembalikan dari Firestore!", icon: 'warning',
           showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
         }).then(async (result) => {
           if (result.isConfirmed) {
@@ -953,7 +999,7 @@
                      doc.setFont("helvetica", "normal").text(pj.nip || "NIP/NIM. ", colX, currentY + 25, { align: "center" });
                   });
 
-                  const savePDF = () => {
+                  const deletePDF = () => {
                      doc.save(`Rekap_Presensi_${monthName.replace(' ', '_')}.pdf`);
                      Swal.close();
                   };
@@ -969,12 +1015,12 @@
                          ctx.drawImage(img, 0, 0);
                          const dataURL = canvas.toDataURL('image/png');
                          doc.addImage(dataURL, 'PNG', pageWidth - 26, 8, 18, 18);
-                         savePDF();
+                         deletePDF();
                      };
-                     img.onerror = () => savePDF();
+                     img.onerror = () => deletePDF();
                      img.src = qrUrl;
                   } else {
-                     savePDF(); 
+                     deletePDF(); 
                   }
                 } catch (error) {
                   console.error(error);
@@ -1012,14 +1058,12 @@
       };
 
       const todayRec = attendanceDb.find(a => a.userId === user?.id && a.date === getLocalYYYYMMDD(currentTime));
-      // Hanya jadikan aktif jika statusnya BUKAN Menunggu
       const activeRec = todayRec && todayRec.status !== 'Menunggu' ? todayRec : null;
       
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // GUARD LOGIN SCREEN
       if (!user) return (
         <div className="h-screen flex items-center justify-center p-4 bg-slate-100 relative overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
@@ -1041,7 +1085,6 @@
         </div>
       );
 
-      // GUARD SYNCING SCREEN
       if (!isDataReady) return (
         <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
           <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
