@@ -36,11 +36,15 @@
       border: 1px solid #f1f5f9 !important;
     }
 
-    /* KEMBALI KE TRANSISI PERTAMA: Efek fade-out & scale-up smooth saat halaman siap */
-    .splash-fade-out {
-      opacity: 0 !important;
-      transform: scale(1.08) !important;
-      transition: opacity 0.6s ease-out, transform 0.6s ease-out !important;
+    /* Keadaan Awal: Splash Screen menutupi 100% layar berbentuk lingkaran penuh */
+    #app-splash-screen {
+      clip-path: circle(150% at 50% 50%);
+      transition: clip-path 0.8s cubic-bezier(0.65, 0, 0.35, 1);
+    }
+
+    /* IMPLEMENTASI BARU: Lingkaran membuka keluar (menyusut lubangnya dari luar ke dalam) */
+    .splash-circle-open {
+      clip-path: circle(0% at 50% 50%) !important;
       pointer-events: none !important;
     }
   </style>
@@ -73,9 +77,9 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
 
-  <!-- SPLASH SCREEN: Muncul instan sejak awal sebelum React dikompilasi -->
-  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4 transition-all duration-700">
-    <div id="splash-content" class="flex flex-col items-center max-w-md text-center space-y-5">
+  <!-- SPLASH SCREEN: Tirai solid pengaman proses jabat tangan React & Firebase -->
+  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4">
+    <div id="splash-content" class="flex flex-col items-center max-w-md text-center space-y-5 transition-all duration-500">
       <img src="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" alt="Logo UNEJ" class="w-24 h-auto drop-shadow-xl animate-pulse" onerror="this.style.display='none'">
       <div class="space-y-1">
         <h1 class="text-2xl md:text-3xl font-black tracking-tight">Selamat Datang</h1>
@@ -280,13 +284,13 @@
                 <div className="flex items-center space-x-3 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-wrap sm:flex-nowrap gap-y-2">
                   <label className="flex items-center space-x-2 cursor-pointer group px-2">
                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                      checked={isLiburMinggu} onChange={e => setSettingsDb({...settingsDb, liburMinggu: e.target.checked ? 'true' : 'false'})} />
+                      checked={isLiburMinggu} onChange={setSettingsDb ? e => setSettingsDb({...settingsDb, liburMinggu: e.target.checked ? 'true' : 'false'}) : null} />
                     <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Minggu Libur</span>
                   </label>
                   <div className="h-5 w-px bg-slate-300 hidden sm:block"></div>
                   <label className="flex items-center space-x-2 cursor-pointer group px-2">
                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                      checked={isLiburSabtu} onChange={e => setSettingsDb({...settingsDb, liburSabtu: e.target.checked ? 'true' : 'false'})} />
+                      checked={isLiburSabtu} onChange={setSettingsDb ? e => setSettingsDb({...settingsDb, liburSabtu: e.target.checked ? 'true' : 'false'}) : null} />
                     <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Sabtu Libur</span>
                   </label>
                   <button onClick={handleSaveRoutineSettings} disabled={isSavingSettings} 
@@ -522,12 +526,22 @@
                }
             }
             
-            // KEMBALI KE ANIMASI TRANSISI PERTAMA: Smooth Fade-Out & Scale-Up halaman splash
+            // TRANSISI JENIS BARU: Circle Masking pembuka dari pusat titik (0%) meluas ke luar
+            const contentDOM = document.getElementById('splash-content');
             const splashDOM = document.getElementById('app-splash-screen');
-            if (splashDOM) {
-              splashDOM.classList.add('splash-fade-out');
-              setTimeout(() => splashDOM.remove(), 600); 
+            
+            if (contentDOM) {
+              contentDOM.style.opacity = "0";
+              contentDOM.style.transform = "scale(0.92)";
             }
+            
+            setTimeout(() => {
+              if (splashDOM) {
+                splashDOM.classList.add('splash-circle-open');
+                setTimeout(() => splashDOM.remove(), 850); 
+              }
+            }, 100);
+
             setIsLoading(false);
           } catch (error) {
             console.error(error);
@@ -1581,17 +1595,17 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
-                               </td>
-                             </tr>
-                           ))
-                         ) : ( 
-                           <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> 
-                         )}
-                       </tbody>
-                     </table>
-                   </div>
-                 </div>
-              )}
+                           </td>
+                         </tr>
+                       ))
+                     ) : ( 
+                       <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada riwayat presensi yang tersimpan.</td></tr> 
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+          )}
 
           {activeMenu === 'dashboard' && user.role === 'admin' && (
             <div className="space-y-8 animate-fadeIn">
