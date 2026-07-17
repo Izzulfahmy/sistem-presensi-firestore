@@ -35,6 +35,14 @@
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
       border: 1px solid #f1f5f9 !important;
     }
+
+    /* PERBAIKAN: Memperbaiki typo !none menjadi !important agar CSS valid */
+    .splash-fade-out {
+      opacity: 0 !important;
+      transform: scale(1.08) !important;
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out !important;
+      pointer-events: none !important;
+    }
   </style>
 
   <script type="module">
@@ -64,6 +72,21 @@
   </script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
+
+  <!-- SPLASH SCREEN: Muncul instan sejak awal sebelum React dikompilasi -->
+  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4 transition-all duration-700">
+    <div class="flex flex-col items-center max-w-md text-center space-y-5">
+      <img src="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" alt="Logo UNEJ" class="w-24 h-auto drop-shadow-xl animate-pulse" onerror="this.style.display='none'">
+      <div class="space-y-1">
+        <h1 class="text-2xl md:text-3xl font-black tracking-tight">Selamat Datang</h1>
+        <p class="text-xs md:text-sm text-blue-100 font-medium opacity-90">Mahasiswa PPL PPG Calon Guru Universitas Jember</p>
+      </div>
+      <div class="pt-4">
+        <div class="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="root"></div>
   
   <script type="text/babel" data-presets="react,env">
@@ -499,6 +522,12 @@
                }
             }
             
+            // ANIMASI DISINI: Menghilangkan Splash Screen dengan efek smooth fade out & scale up
+            const splashDOM = document.getElementById('app-splash-screen');
+            if (splashDOM) {
+              splashDOM.classList.add('splash-fade-out');
+              setTimeout(() => splashDOM.remove(), 600); 
+            }
             setIsLoading(false);
           } catch (error) {
             console.error(error);
@@ -1221,16 +1250,14 @@
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
 
-      // LOGIKA DINAMIS DROPDOWN: Mengekstrak daftar bulan-tahun unik yang HANYA memiliki data presensi di database
       const availableMonthsOptions = useMemo(() => {
         const monthsSet = new Set();
         attendanceDb.forEach(a => {
           if (a.date && a.date.length >= 7) {
-            monthsSet.add(a.date.substring(0, 7)); // Ambil format YYYY-MM
+            monthsSet.add(a.date.substring(0, 7));
           }
         });
         
-        // Selalu pastikan bulan sekarang ikut masuk ke daftar opsi sebagai default
         const currentYearMonth = todayStr.substring(0, 7);
         monthsSet.add(currentYearMonth);
         
@@ -1345,15 +1372,7 @@
         </div>
       );
 
-      if (!isDataReady) return (
-        <div className="h-screen flex items-center justify-center bg-slate-50 flex-col">
-          <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center border border-slate-100">
-            <i className="fas fa-circle-notch fa-spin text-4xl text-blue-600 mb-6"></i>
-            <p className="font-bold text-slate-800 text-lg">Memuat Dashboard...</p>
-            <p className="text-sm text-slate-500 font-medium">Menyiapkan data presensi...</p>
-          </div>
-        </div>
-      );
+      if (!isDataReady) return null; 
 
       return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
@@ -1609,7 +1628,6 @@
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-chart-bar mr-2 text-blue-600"></i>Ringkasan Akumulasi Kehadiran Bulanan</h3>
                     <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran pada periode aktif: <b className="text-blue-600">{filterMonth}</b></p>
                   </div>
-                  {/* PENAMBAHAN DROPDOWN DINAMIS: Menampilkan hanya bulan-bulan yang memiliki riwayat aktivitas presensi */}
                   <div className="flex items-center space-x-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wide hidden sm:block">Pilih Periode:</label>
                     <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
@@ -1764,7 +1782,7 @@
                     <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all h-[38px]" />
                     <button onClick={handleAddBulkAttendance} className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Tambah Presensi Massal"><i className="fas fa-calendar-plus text-lg"></i></button>
                     {hasData && currentVerif && (<a href={currentVerif.url} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buka Halaman Verifikasi Resmi"><i className="fas fa-external-link-alt text-lg"></i></a>)}
-                    {hasData && !currentVerif && (<button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buat Link Verifikasi Baru"><i className="fas fa-link text-lg"></i></button>)}
+                    {hasData && !currentVerif && (<button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Unduh Tautan Verifikasi Baru"><i className="fas fa-link text-lg"></i></button>)}
                     {hasData && (
                       <button onClick={handleDownloadPDF} className="bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Unduh Laporan Format PDF"><i className="fas fa-file-pdf text-lg"></i></button>
                     )}
