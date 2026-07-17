@@ -773,7 +773,6 @@
         });
       };
 
-      // PERBAIKAN: Fungsi pembuat link verifikasi resmi dinamis berbasis Firestore
       const handleGenerateVerif = async () => {
         Swal.fire({
           html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Membuat Tautan Verifikasi Resmi...</p></div>',
@@ -1028,7 +1027,6 @@
                    Swal.close();
                 };
 
-                // PERBAIKAN: QR Code mengarah langsung ke URL Verifikasi resmi spesifik dokumen bulan tersebut
                 if (currentVerifMatch && currentVerifMatch.url) {
                    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(currentVerifMatch.url);
                    const img = new Image();
@@ -1222,6 +1220,26 @@
       const filteredAttendanceData = attendanceDb.filter(a => a.date.startsWith(filterMonth));
       const currentVerif = verificationsDb.find(v => v.month === filterMonth);
       const hasData = filteredAttendanceData.length > 0;
+
+      // LOGIKA DINAMIS DROPDOWN: Mengekstrak daftar bulan-tahun unik yang HANYA memiliki data presensi di database
+      const availableMonthsOptions = useMemo(() => {
+        const monthsSet = new Set();
+        attendanceDb.forEach(a => {
+          if (a.date && a.date.length >= 7) {
+            monthsSet.add(a.date.substring(0, 7)); // Ambil format YYYY-MM
+          }
+        });
+        
+        // Selalu pastikan bulan sekarang ikut masuk ke daftar opsi sebagai default
+        const currentYearMonth = todayStr.substring(0, 7);
+        monthsSet.add(currentYearMonth);
+        
+        return Array.from(monthsSet).sort().reverse().map(ym => {
+          const [year, month] = ym.split('-');
+          const labelName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+          return { value: ym, label: labelName };
+        });
+      }, [attendanceDb, todayStr]);
 
       const todayAttendanceList = useMemo(() => {
         return usersDb.filter(u => u.role === 'client').map(client => {
@@ -1464,7 +1482,7 @@
                         <p className="text-xs font-medium text-slate-500 mt-1">Mohon tunggu sebentar</p>
                       </div>
                     )}
-                    <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-50 rounded-full mix-blend-multiply opacity-50 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
+                    <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-50 rounded-full mix-blend-multiply filter blur-3xl opacity-50 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
                     <div className="bg-blue-600 w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-blue-200/50 relative z-10 text-white"><i className="fas fa-fingerprint text-4xl"></i></div>
                     <h2 className="text-2xl font-bold text-slate-800 mb-4 relative z-10">Presensi Digital PPL</h2>
                     <div className="flex flex-col items-center space-y-2.5 mb-8 relative z-10">
@@ -1589,10 +1607,17 @@
                 <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-chart-bar mr-2 text-blue-600"></i>Ringkasan Akumulasi Kehadiran Bulanan</h3>
-                    {/* PENYESUAIAN BAHASA 3: Mengganti teks sesuai permintaan user */}
                     <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran pada periode aktif: <b className="text-blue-600">{filterMonth}</b></p>
                   </div>
-                  <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-wider tabular-nums">Total Rekap</span>
+                  {/* PENAMBAHAN DROPDOWN DINAMIS: Menampilkan hanya bulan-bulan yang memiliki riwayat aktivitas presensi */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wide hidden sm:block">Pilih Periode:</label>
+                    <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
+                      {availableMonthsOptions.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="overflow-x-auto p-2">
                   <table className="w-full text-left border-collapse min-w-[500px]">
@@ -1631,9 +1656,7 @@
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
-                    {/* PENYESUAIAN BAHASA 1: Mengganti judul peninjauan */}
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-clipboard-list mr-2 text-blue-600"></i>Status Kehadiran Hari Ini</h3>
-                    {/* PENYESUAIAN BAHASA 2: Mengganti deskripsi real-time */}
                     <p className="text-xs text-slate-400 font-medium mt-0.5">Daftar rekap kehadiran real-time per tanggal {currentTime.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
                   </div>
                   <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-wider tracking-tight tabular-nums">Hari Aktif</span>
@@ -1742,7 +1765,6 @@
                     <button onClick={handleAddBulkAttendance} className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Tambah Presensi Massal"><i className="fas fa-calendar-plus text-lg"></i></button>
                     {hasData && currentVerif && (<a href={currentVerif.url} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buka Halaman Verifikasi Resmi"><i className="fas fa-external-link-alt text-lg"></i></a>)}
                     {hasData && !currentVerif && (<button onClick={handleGenerateVerif} className="bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Buat Link Verifikasi Baru"><i className="fas fa-link text-lg"></i></button>)}
-                    {/* PROTEKSI TOMBOL: Tombol unduh PDF ini hanya akan muncul jika ada data (hasData) di bulan tersebut */}
                     {hasData && (
                       <button onClick={handleDownloadPDF} className="bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 p-2.5 rounded-lg transition-all flex items-center justify-center shadow-sm h-[38px] w-[38px] shrink-0" title="Unduh Laporan Format PDF"><i className="fas fa-file-pdf text-lg"></i></button>
                     )}
