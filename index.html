@@ -773,8 +773,47 @@
         });
       };
 
-      const handleGenerateVerif = () => {
-         Swal.fire('Info', 'Fitur verifikasi tautan sedang disiapkan untuk pembaruan berikutnya.', 'info');
+      // PERBAIKAN: Fungsi pembuat link verifikasi resmi dinamis berbasis Firestore
+      const handleGenerateVerif = async () => {
+        Swal.fire({
+          html: '<div class="flex flex-col items-center py-2"><div class="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-4"></div><p class="text-slate-600 font-bold text-sm">Membuat Tautan Verifikasi Resmi...</p></div>',
+          allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-xs' }
+        });
+
+        try {
+          const [yearStr, monthStr] = filterMonth.split('-');
+          const vid = `${yearStr}${monthStr}-${Date.now().toString(16).substring(4).toUpperCase()}`;
+          
+          let baseUrl = settingsDb.appScriptUrl || (window.location.origin + window.location.pathname);
+          if (baseUrl.endsWith('index.html')) {
+            baseUrl = baseUrl.replace('index.html', '');
+          }
+          if (!baseUrl.endsWith('/')) baseUrl += '/';
+          
+          const verificationUrl = `${baseUrl}verification.html?vid=${vid}`;
+          
+          const newVerif = {
+            id: Date.now(),
+            month: filterMonth,
+            vid: vid,
+            url: verificationUrl
+          };
+
+          await window.fs.setDoc(window.fs.doc(window.db, "verifications", newVerif.id.toString()), newVerif);
+          setVerificationsDb(prev => [...prev, newVerif]);
+          
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil!',
+            text: 'Tautan verifikasi bulan ini telah berhasil dibuat.',
+            timer: 1500,
+            showConfirmButton: false,
+            customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }
+          });
+        } catch (error) {
+          console.error(error);
+          Swal.fire('Error', 'Gagal membuat tautan verifikasi resmi.', 'error');
+        }
       };
 
       const handleDownloadPDF = async () => {
@@ -989,9 +1028,9 @@
                    Swal.close();
                 };
 
-                // DIBUAT DINAMIS: QR Code hanya dicetak jika bulan aktif saat ini sudah diverifikasi resmi
-                if (currentVerifMatch && settingsDb.appScriptUrl && settingsDb.appScriptUrl.trim() !== "") {
-                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(settingsDb.appScriptUrl + "?vid=" + currentVerifMatch.vid);
+                // PERBAIKAN: QR Code mengarah langsung ke URL Verifikasi resmi spesifik dokumen bulan tersebut
+                if (currentVerifMatch && currentVerifMatch.url) {
+                   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=1&data=" + encodeURIComponent(currentVerifMatch.url);
                    const img = new Image();
                    img.crossOrigin = "Anonymous";
                    img.onload = function() {
@@ -1425,7 +1464,7 @@
                         <p className="text-xs font-medium text-slate-500 mt-1">Mohon tunggu sebentar</p>
                       </div>
                     )}
-                    <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-50 rounded-full mix-blend-multiply filter blur-3xl opacity-50 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
+                    <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-50 rounded-full mix-blend-multiply opacity-50 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
                     <div className="bg-blue-600 w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-blue-200/50 relative z-10 text-white"><i className="fas fa-fingerprint text-4xl"></i></div>
                     <h2 className="text-2xl font-bold text-slate-800 mb-4 relative z-10">Presensi Digital PPL</h2>
                     <div className="flex flex-col items-center space-y-2.5 mb-8 relative z-10">
@@ -1464,7 +1503,7 @@
                         <div className="flex justify-between items-center bg-slate-800/50 p-5 rounded-xl border border-slate-700/50">
                           <div className="space-y-1">
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center"><i className="fas fa-door-closed mr-1.5 text-slate-500"></i>Jam Pulang</p>
-                            <p className="text-3xl font-black tabular-nums text-slate-300">{activeRec.timeOut || '--:--'}</p>
+                            <p className="text-3xl font-black tabular-nums">{activeRec.timeOut || '--:--'}</p>
                           </div>
                           {activeRec.timeOut ? (
                             <div className="bg-blue-500/20 p-2.5 rounded-lg border border-blue-500/30"><i className="fas fa-check text-xl text-blue-400"></i></div>
@@ -1505,17 +1544,17 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
-                               </td>
-                             </tr>
-                           ))
-                         ) : ( 
-                           <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> 
-                         )}
-                       </tbody>
-                     </table>
-                   </div>
-                 </div>
-              )}
+                           </td>
+                         </tr>
+                       ))
+                     ) : ( 
+                       <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada riwayat presensi yang tersimpan.</td></tr> 
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+          )}
 
           {activeMenu === 'dashboard' && user.role === 'admin' && (
             <div className="space-y-8 animate-fadeIn">
@@ -1550,7 +1589,8 @@
                 <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
                     <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-chart-bar mr-2 text-blue-600"></i>Ringkasan Akumulasi Kehadiran Bulanan</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran mandiri personil client pada periode aktif: <b className="text-blue-600">{filterMonth}</b></p>
+                    {/* PENYESUAIAN BAHASA 3: Mengganti teks sesuai permintaan user */}
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Total akumulasi kehadiran pada periode aktif: <b className="text-blue-600">{filterMonth}</b></p>
                   </div>
                   <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-wider tabular-nums">Total Rekap</span>
                 </div>
@@ -1591,8 +1631,10 @@
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div>
-                    <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-clipboard-list mr-2 text-blue-600"></i>Status Pemantauan Client Hari Ini</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">Daftar rekapan real-time seluruh personil client per tanggal {currentTime.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
+                    {/* PENYESUAIAN BAHASA 1: Mengganti judul peninjauan */}
+                    <h3 className="text-base font-bold text-slate-800 flex items-center"><i className="fas fa-clipboard-list mr-2 text-blue-600"></i>Status Kehadiran Hari Ini</h3>
+                    {/* PENYESUAIAN BAHASA 2: Mengganti deskripsi real-time */}
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Daftar rekap kehadiran real-time per tanggal {currentTime.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
                   </div>
                   <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-wider tracking-tight tabular-nums">Hari Aktif</span>
                 </div>
@@ -1874,6 +1916,6 @@
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
-  </script>
+</script>
 </body>
 </html>
