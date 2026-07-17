@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Presensi PPL 2</title>
   
-  <link class="splash-fade-out" icon type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
+  <link rel="icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   <link rel="shortcut icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
@@ -36,16 +36,11 @@
       border: 1px solid #f1f5f9 !important;
     }
 
-    /* Keadaan Awal: Splash screen solid menutupi 100% layar penuh */
-    #app-splash-screen {
-      clip-path: circle(150% at 50% 50%);
-      transition: clip-path 0.8s cubic-bezier(0.76, 0, 0.24, 1), opacity 0.7s ease-out;
-    }
-
-    /* DI BALIK: Menyusut mengecil dari luar ke pusat tengah hingga 0% */
-    .splash-circle-close {
-      clip-path: circle(0% at 50% 50%) !important;
+    /* KEMBALI KE TRANSISI PERTAMA: Efek fade-out & scale-up smooth saat halaman siap */
+    .splash-fade-out {
       opacity: 0 !important;
+      transform: scale(1.08) !important;
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out !important;
       pointer-events: none !important;
     }
   </style>
@@ -78,9 +73,9 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
 
-  <!-- SPLASH SCREEN -->
-  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4">
-    <div id="splash-content" class="flex flex-col items-center max-w-md text-center space-y-5 transition-all duration-500">
+  <!-- SPLASH SCREEN: Muncul instan sejak awal sebelum React dikompilasi -->
+  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4 transition-all duration-700">
+    <div id="splash-content" class="flex flex-col items-center max-w-md text-center space-y-5">
       <img src="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" alt="Logo UNEJ" class="w-24 h-auto drop-shadow-xl animate-pulse" onerror="this.style.display='none'">
       <div class="space-y-1">
         <h1 class="text-2xl md:text-3xl font-black tracking-tight">Selamat Datang</h1>
@@ -527,22 +522,12 @@
                }
             }
             
-            // TRANSISI MENYUSUT KE PUSAT: Mengaktifkan kelas circle close ke pusat tengah
-            const contentDOM = document.getElementById('splash-content');
+            // KEMBALI KE ANIMASI TRANSISI PERTAMA: Smooth Fade-Out & Scale-Up halaman splash
             const splashDOM = document.getElementById('app-splash-screen');
-            
-            if (contentDOM) {
-              contentDOM.style.opacity = "0";
-              contentDOM.style.transform = "scale(0.9)";
+            if (splashDOM) {
+              splashDOM.classList.add('splash-fade-out');
+              setTimeout(() => splashDOM.remove(), 600); 
             }
-            
-            setTimeout(() => {
-              if (splashDOM) {
-                splashDOM.classList.add('splash-circle-close');
-                setTimeout(() => splashDOM.remove(), 800); 
-              }
-            }, 100);
-
             setIsLoading(false);
           } catch (error) {
             console.error(error);
@@ -787,7 +772,7 @@
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
         const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
 
-        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan sebagai hari libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
         if (holidaysDb.find(h => h.date === todayStr)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini tanggal merah.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
 
         Swal.fire({
@@ -1322,7 +1307,7 @@
             if (matchRecord) {
               if (['Hadir', 'Terlambat'].includes(matchRecord.status)) countHadir++;
               else if (matchRecord.status === 'Izin') countIzin++;
-              else if (matchRecord.status === 'Sakit') countHadir++; // fallback safe
+              else if (matchRecord.status === 'Sakit') countSakit++;
               else if (matchRecord.status === 'Alpa') countAlpa++;
             } else {
               if (!isRoutineHoliday && !isSpecialHoliday && loopDateObj <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
@@ -1386,6 +1371,8 @@
           </div>
         </div>
       );
+
+      if (!isDataReady) return null; 
 
       return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
@@ -1594,17 +1581,17 @@
                                <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
                                <td className="px-4 py-3">
                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
-                           </td>
-                         </tr>
-                       ))
-                     ) : ( 
-                       <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada riwayat presensi yang tersimpan.</td></tr> 
-                     )}
-                   </tbody>
-                 </table>
-               </div>
-             </div>
-          )}
+                               </td>
+                             </tr>
+                           ))
+                         ) : ( 
+                           <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-medium"><i className="fas fa-folder-open text-2xl mb-2 block opacity-50"></i>Belum ada data presensi pada bulan ini.</td></tr> 
+                         )}
+                       </tbody>
+                     </table>
+                   </div>
+                 </div>
+              )}
 
           {activeMenu === 'dashboard' && user.role === 'admin' && (
             <div className="space-y-8 animate-fadeIn">
