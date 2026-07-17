@@ -36,11 +36,16 @@
       border: 1px solid #f1f5f9 !important;
     }
 
-    /* PERBAIKAN: Memperbaiki typo !none menjadi !important agar CSS valid */
-    .splash-fade-out {
+    /* Keadaan Awal Splash Screen */
+    #app-splash-screen {
+      clip-path: circle(150% at 50% 50%);
+      transition: clip-path 0.8s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.8s ease-out;
+    }
+
+    /* PERBAIKAN EFEK: Transisi solid berbentuk lingkaran membuka dari tengah */
+    .splash-circle-open {
+      clip-path: circle(0% at 50% 50%) !important;
       opacity: 0 !important;
-      transform: scale(1.08) !important;
-      transition: opacity 0.6s ease-out, transform 0.6s ease-out !important;
       pointer-events: none !important;
     }
   </style>
@@ -73,13 +78,13 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
 
-  <!-- SPLASH SCREEN: Muncul instan sejak awal sebelum React dikompilasi -->
-  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4 transition-all duration-700">
-    <div class="flex flex-col items-center max-w-md text-center space-y-5">
+  <!-- SPLASH SCREEN: Tampilan solid warna biru di awal muat skrip -->
+  <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4">
+    <div id="splash-content" class="flex flex-col items-center max-w-md text-center space-y-5 transition-transform duration-500">
       <img src="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" alt="Logo UNEJ" class="w-24 h-auto drop-shadow-xl animate-pulse" onerror="this.style.display='none'">
       <div class="space-y-1">
         <h1 class="text-2xl md:text-3xl font-black tracking-tight">Selamat Datang</h1>
-        <p class="text-xs md:text-sm text-blue-100 font-medium opacity-90">Mahasiswa PPG Calon Guru Universitas Jember</p>
+        <p class="text-xs md:text-sm text-blue-100 font-medium opacity-90">Mahasiswa PPL PPG Calon Guru Universitas Jember</p>
       </div>
       <div class="pt-4">
         <div class="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -522,12 +527,19 @@
                }
             }
             
-            // ANIMASI DISINI: Menghilangkan Splash Screen dengan efek smooth fade out & scale up
+            // TRANSISI LINGKARAN MEMBESAR: Memicu animasi mengecilkan tirai splash berbentuk circle dari tengah
+            const contentDOM = document.getElementById('splash-content');
             const splashDOM = document.getElementById('app-splash-screen');
-            if (splashDOM) {
-              splashDOM.classList.add('splash-fade-out');
-              setTimeout(() => splashDOM.remove(), 600); 
-            }
+            
+            if (contentDOM) contentDOM.style.transform = "scale(0.85)";
+            
+            setTimeout(() => {
+              if (splashDOM) {
+                splashDOM.classList.add('splash-circle-open');
+                setTimeout(() => splashDOM.remove(), 800); 
+              }
+            }, 150);
+
             setIsLoading(false);
           } catch (error) {
             console.error(error);
@@ -637,7 +649,7 @@
         }
 
         if (availableDates.length === 0) {
-          return Swal.fire({ icon: 'info', title: 'Pemberitahuan', text: 'Semua tanggal pada bulan ini sudah memiliki data presensi.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
+          return Swal.fire({ icon: 'info', title: 'PEMBERITAHUAN', text: 'Semua tanggal pada bulan ini sudah memiliki data presensi.', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' } });
         }
 
         Swal.fire({
@@ -1371,8 +1383,6 @@
           </div>
         </div>
       );
-
-      if (!isDataReady) return null; 
 
       return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
