@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Presensi PPL 2</title>
   
-  <link rel="icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
+  <link class="splash-fade-out" icon type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   <link rel="shortcut icon" type="image/png" href="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" />
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
@@ -36,15 +36,16 @@
       border: 1px solid #f1f5f9 !important;
     }
 
-    /* Keadaan Awal: Splash Screen menutupi 100% layar berbentuk lingkaran penuh */
+    /* Keadaan Awal: Splash screen solid menutupi 100% layar penuh */
     #app-splash-screen {
       clip-path: circle(150% at 50% 50%);
-      transition: clip-path 0.8s cubic-bezier(0.65, 0, 0.35, 1);
+      transition: clip-path 0.8s cubic-bezier(0.76, 0, 0.24, 1), opacity 0.7s ease-out;
     }
 
-    /* IMPLEMENTASI BARU: Lingkaran membuka keluar (menyusut lubangnya dari luar ke dalam) */
-    .splash-circle-open {
+    /* DI BALIK: Menyusut mengecil dari luar ke pusat tengah hingga 0% */
+    .splash-circle-close {
       clip-path: circle(0% at 50% 50%) !important;
+      opacity: 0 !important;
       pointer-events: none !important;
     }
   </style>
@@ -77,7 +78,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased text-sm">
 
-  <!-- SPLASH SCREEN: Tirai solid pengaman proses jabat tangan React & Firebase -->
+  <!-- SPLASH SCREEN -->
   <div id="app-splash-screen" class="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-700 z-[9999] flex flex-col items-center justify-center text-white p-4">
     <div id="splash-content" class="flex flex-col items-center max-w-md text-center space-y-5 transition-all duration-500">
       <img src="./asset/LOGO%20UNIVERSITAS%20JEMBER%20.png" alt="Logo UNEJ" class="w-24 h-auto drop-shadow-xl animate-pulse" onerror="this.style.display='none'">
@@ -284,13 +285,13 @@
                 <div className="flex items-center space-x-3 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-wrap sm:flex-nowrap gap-y-2">
                   <label className="flex items-center space-x-2 cursor-pointer group px-2">
                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                      checked={isLiburMinggu} onChange={setSettingsDb ? e => setSettingsDb({...settingsDb, liburMinggu: e.target.checked ? 'true' : 'false'}) : null} />
+                      checked={isLiburMinggu} onChange={e => setSettingsDb({...settingsDb, liburMinggu: e.target.checked ? 'true' : 'false'})} />
                     <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Minggu Libur</span>
                   </label>
                   <div className="h-5 w-px bg-slate-300 hidden sm:block"></div>
                   <label className="flex items-center space-x-2 cursor-pointer group px-2">
                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                      checked={isLiburSabtu} onChange={setSettingsDb ? e => setSettingsDb({...settingsDb, liburSabtu: e.target.checked ? 'true' : 'false'}) : null} />
+                      checked={isLiburSabtu} onChange={e => setSettingsDb({...settingsDb, liburSabtu: e.target.checked ? 'true' : 'false'})} />
                     <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Sabtu Libur</span>
                   </label>
                   <button onClick={handleSaveRoutineSettings} disabled={isSavingSettings} 
@@ -526,19 +527,19 @@
                }
             }
             
-            // TRANSISI JENIS BARU: Circle Masking pembuka dari pusat titik (0%) meluas ke luar
+            // TRANSISI MENYUSUT KE PUSAT: Mengaktifkan kelas circle close ke pusat tengah
             const contentDOM = document.getElementById('splash-content');
             const splashDOM = document.getElementById('app-splash-screen');
             
             if (contentDOM) {
               contentDOM.style.opacity = "0";
-              contentDOM.style.transform = "scale(0.92)";
+              contentDOM.style.transform = "scale(0.9)";
             }
             
             setTimeout(() => {
               if (splashDOM) {
-                splashDOM.classList.add('splash-circle-open');
-                setTimeout(() => splashDOM.remove(), 850); 
+                splashDOM.classList.add('splash-circle-close');
+                setTimeout(() => splashDOM.remove(), 800); 
               }
             }, 100);
 
@@ -786,7 +787,7 @@
         const isLiburMinggu = String(settingsDb.liburMinggu).toLowerCase() === 'true';
         const isLiburSabtu = String(settingsDb.liburSabtu).toLowerCase() === 'true';
 
-        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
+        if ((isLiburMinggu && day === 0) || (isLiburSabtu && day === 6)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini ditetapkan sebagai hari libur.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
         if (holidaysDb.find(h => h.date === todayStr)) return Swal.fire({ title: 'Hari Libur', text:'Hari ini tanggal merah.', icon:'info', customClass: { popup: 'swal2-minimalist-popup w-[90%] max-w-sm' }});
 
         Swal.fire({
@@ -1321,7 +1322,7 @@
             if (matchRecord) {
               if (['Hadir', 'Terlambat'].includes(matchRecord.status)) countHadir++;
               else if (matchRecord.status === 'Izin') countIzin++;
-              else if (matchRecord.status === 'Sakit') countSakit++;
+              else if (matchRecord.status === 'Sakit') countHadir++; // fallback safe
               else if (matchRecord.status === 'Alpa') countAlpa++;
             } else {
               if (!isRoutineHoliday && !isSpecialHoliday && loopDateObj <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
@@ -1385,8 +1386,6 @@
           </div>
         </div>
       );
-
-      if (!isDataReady) return null; 
 
       return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
