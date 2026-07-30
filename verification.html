@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verifikasi Laporan Presensi</title>
   
+  <link rel="icon" type="image/png" href="./asset/logo.png" />
+  <link rel="shortcut icon" type="image/png" href="./asset/logo.png" />
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" crossorigin="anonymous"></script>
@@ -85,6 +88,7 @@
       const [usersDb, setUsersDb] = useState([]);
       const [attendanceDb, setAttendanceDb] = useState([]);
       const [holidaysDb, setHolidaysDb] = useState([]);
+      const [shiftDaysDb, setShiftDaysDb] = useState([]);
       
       const targetValid = window.TARGET_MONTH && window.TARGET_MONTH.length > 0 && window.TARGET_MONTH.includes('-');
       const [yearStr, monthStr] = targetValid 
@@ -101,17 +105,19 @@
             // 1. Lakukan Autentikasi Anonim di latar belakang sebelum mengambil data
             await window.fs.signInAnonymously(window.auth);
 
-            // 2. Jika sukses bypass auth token, ambil data seperti biasa
-            const [usersSnap, attSnap, holSnap, setSnap] = await Promise.all([
+            // 2. Ambil seluruh data termasuk shiftDays dari Firestore
+            const [usersSnap, attSnap, holSnap, shiftSnap, setSnap] = await Promise.all([
               window.fs.getDocs(window.fs.collection(window.db, "users")),
               window.fs.getDocs(window.fs.collection(window.db, "attendance")),
               window.fs.getDocs(window.fs.collection(window.db, "holidays")),
+              window.fs.getDocs(window.fs.collection(window.db, "shiftDays")),
               window.fs.getDocs(window.fs.collection(window.db, "settings"))
             ]);
 
             setUsersDb(usersSnap.docs.map(d => d.data()));
             setAttendanceDb(attSnap.docs.map(d => d.data()));
             setHolidaysDb(holSnap.docs.map(d => d.data()));
+            setShiftDaysDb(shiftSnap.docs.map(d => d.data()));
             
             let s = {};
             setSnap.forEach(d => { if(d.id === 'config') s = d.data(); });
@@ -254,18 +260,20 @@
                     <th className="p-2 border-r border-slate-300 text-center text-green-700" title="Hadir">H</th>
                     <th className="p-2 border-r border-slate-300 text-center text-purple-700" title="Izin">I</th>
                     <th className="p-2 border-r border-slate-300 text-center text-yellow-700" title="Sakit">S</th>
+                    <th className="p-2 border-r border-slate-300 text-center text-indigo-700" title="Libur Shift">LS</th>
                     <th className="p-2 text-center text-red-700" title="Alpa">A</th>
                   </tr>
                 </thead>
                 <tbody className="text-[10px] sm:text-xs">
                   {clients.map((client, index) => {
-                    let totalH = 0, totalI = 0, totalS = 0, totalA = 0;
+                    let totalH = 0, totalI = 0, totalS = 0, totalLS = 0, totalA = 0;
                     const dailyData = Array.from({ length: daysInMonth }, (_, d) => {
                       const dayDate = new Date(year, monthIndex, d + 1);
                       const dateStr = getLocalYYYYMMDD(dayDate);
                       const dayOfWeek = dayDate.getDay();
                       const isRoutineHoliday = (dayOfWeek === 0 && String(settingsDb.liburMinggu).toLowerCase() === 'true') || (dayOfWeek === 6 && String(settingsDb.liburSabtu).toLowerCase() === 'true');
                       const isSpecialHoliday = holidaysDb.find(h => h.date === dateStr);
+                      const isShiftDay = shiftDaysDb.some(s => s.date === dateStr);
                       
                       const record = attendanceDb.find(a => a.userId === client.id && a.date === dateStr);
                       const hasActivityOnDate = attendanceDb.some(a => a.date === dateStr);
@@ -275,10 +283,12 @@
                         if (['Hadir', 'Terlambat'].includes(s)) { totalH++; return s === 'Hadir' ? {val: 'H', color: 'text-green-700 font-bold bg-green-50/50'} : {val: 'T', color: 'text-orange-600 font-bold bg-orange-50/50'}; }
                         if (s === 'Izin') { totalI++; return {val: 'I', color: 'text-purple-700 font-bold bg-purple-50/50'}; }
                         if (s === 'Sakit') { totalS++; return {val: 'S', color: 'text-yellow-600 font-bold bg-yellow-50/50'}; }
+                        if (s === 'Libur Shift') { totalLS++; return {val: 'LS', color: 'text-indigo-600 font-bold'}; }
                         if (s === 'Alpa') { totalA++; return {val: 'A', color: 'text-red-600 font-bold bg-red-50/50'}; }
                         return {val: '', color: ''};
                       } else {
                         if (isRoutineHoliday || isSpecialHoliday) return {val: 'L', color: 'bg-red-500 text-white font-bold'};
+                        if (isShiftDay) { totalLS++; return {val: 'LS', color: 'text-indigo-600 font-bold'}; }
                         if (dayDate <= new Date() && hasActivityOnDate) { totalA++; return {val: 'A', color: 'text-red-600 font-bold bg-red-50/50'}; }
                         return {val: '', color: ''};
                       }
@@ -294,11 +304,12 @@
                         <td className="p-2 border-r border-slate-300 text-center font-black text-green-700 bg-slate-50">{totalH}</td>
                         <td className="p-2 border-r border-slate-300 text-center font-black text-purple-700 bg-slate-50">{totalI}</td>
                         <td className="p-2 border-r border-slate-300 text-center font-black text-yellow-600 bg-slate-50">{totalS}</td>
+                        <td className="p-2 border-r border-slate-300 text-center font-black text-indigo-600 bg-slate-50">{totalLS}</td>
                         <td className="p-2 text-center font-black text-red-600 bg-slate-50">{totalA}</td>
                       </tr>
                     );
                   })}
-                  {clients.length === 0 && <tr><td colSpan={daysInMonth + 6} className="p-10 text-center text-slate-400 font-medium italic">Tidak ada data client.</td></tr>}
+                  {clients.length === 0 && <tr><td colSpan={daysInMonth + 7} className="p-10 text-center text-slate-400 font-medium italic">Tidak ada data client.</td></tr>}
                 </tbody>
               </table>
               <div className="mt-4 flex flex-wrap gap-4 text-[9px] text-slate-600 font-bold uppercase tracking-wider bg-slate-50 p-3 rounded-lg border border-slate-200">
@@ -307,6 +318,7 @@
                 <span className="flex items-center"><div className="w-2.5 h-2.5 bg-orange-100 border border-orange-400 mr-1.5"></div>T = Terlambat</span>
                 <span className="flex items-center"><div className="w-2.5 h-2.5 bg-purple-100 border border-purple-400 mr-1.5"></div>I = Izin</span>
                 <span className="flex items-center"><div className="w-2.5 h-2.5 bg-yellow-100 border border-yellow-400 mr-1.5"></div>S = Sakit</span>
+                <span className="flex items-center"><div className="w-2.5 h-2.5 bg-indigo-100 border border-indigo-400 mr-1.5"></div>LS = Libur Shift</span>
                 <span className="flex items-center"><div className="w-2.5 h-2.5 bg-red-100 border border-red-400 mr-1.5"></div>A = Alpa</span>
                 <span className="flex items-center"><div className="w-2.5 h-2.5 bg-red-500 mr-1.5"></div>L = Libur</span>
               </div>
