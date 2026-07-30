@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Presensi PPL 2</title>
   
-  <link rel="icon" type="image/png" href="./asset/logo.png/>
+  <link rel="icon" type="image/png" href="./asset/logo.png" />
   <link rel="shortcut icon" type="image/png" href="./asset/logo.png" />
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
@@ -725,8 +725,8 @@
             let updatedRec;
 
             if (existingUserRec) {
-                updatedRec = { ...existingUserRec, timeIn: time, status: late ? 'Terlambat' : 'Hadir' };
-                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), { timeIn: time, status: updatedRec.status });
+                updatedRec = { ...existingUserRec, timeIn: time, timeOut: null, status: late ? 'Terlambat' : 'Hadir' };
+                await window.fs.updateDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), { timeIn: time, timeOut: null, status: updatedRec.status });
             } else {
                 updatedRec = { id: Date.now(), userId: user?.id, date: todayStr, timeIn: time, timeOut: null, status: late ? 'Terlambat' : 'Hadir' };
                 await window.fs.setDoc(window.fs.doc(window.db, "attendance", updatedRec.id.toString()), updatedRec);
@@ -909,13 +909,13 @@
                       else if (record.status === 'Izin') { row.push('I'); totalIzin++; }
                       else if (record.status === 'Sakit') { row.push('S'); totalSakit++; }
                       else if (record.status === 'Alpa') { row.push('A'); totalAlpa++; }
-                      else { row.push(''); } 
+                      else { row.push('-'); } 
                     } else {
                       if (isRoutineHoliday || isSpecialHoliday) row.push('L');
                       else {
                          if (dayDate <= new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate())) {
-                            if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('');
-                         } else row.push('');
+                            if (hasActivityOnDate) { row.push('A'); totalAlpa++; } else row.push('-');
+                         } else row.push('-');
                       }
                     }
                   }
@@ -975,29 +975,30 @@
                         isHolidayCol = (dayOfWeek === 0 && isLiburMinggu) || (dayOfWeek === 6 && isLiburSabtu) || holidaysDb.find(h => h.date === dateStr);
                      }
                      if (data.section === 'head') {
-                       data.cell.styles.fillColor = [255, 255, 255]; 
-                       data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
+                        data.cell.styles.fillColor = [255, 255, 255]; 
+                        data.cell.styles.textColor = isHolidayCol ? [220, 38, 38] : [0, 0, 0];
                      }
                      if (data.section === 'body') {
-                       if (data.column.index === 0 || data.column.index === 1) { 
-                          data.cell.styles.textColor = [15, 23, 42]; 
-                          data.cell.styles.fontStyle = 'bold'; 
-                          data.cell.styles.fontSize = 8.5; 
-                       }
-                       if (isColumnDate) {
-                         const val = data.cell.raw;
-                         if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                         else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
-                       } else if (data.column.index >= daysInMonth + 2) {
+                        if (data.column.index === 0 || data.column.index === 1) { 
+                           data.cell.styles.textColor = [15, 23, 42]; 
+                           data.cell.styles.fontStyle = 'bold'; 
+                           data.cell.styles.fontSize = 8.5; 
+                        }
+                        if (isColumnDate) {
+                          const val = data.cell.raw;
+                          if (val === 'H') { data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
+                          else if (val === 'T') { data.cell.styles.textColor = [234, 88, 12]; data.cell.styles.fontStyle = 'bold'; }
+                          else if (val === 'I') { data.cell.styles.textColor = [147, 51, 234]; data.cell.styles.fontStyle = 'bold'; }
+                          else if (val === 'S') { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = 'bold'; }
+                          else if (val === 'A') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+                          else if (val === 'L' || isHolidayCol) { data.cell.styles.textColor = [255, 255, 255]; data.cell.styles.fillColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+                          else if (val === '-') { data.cell.styles.textColor = [148, 163, 184]; }
+                        } else if (data.column.index >= daysInMonth + 2) {
                           if (data.column.index === daysInMonth + 2) data.cell.styles.textColor = [21, 128, 61]; 
                           if (data.column.index === daysInMonth + 3) data.cell.styles.textColor = [147, 51, 234]; 
                           if (data.column.index === daysInMonth + 4) data.cell.styles.textColor = [234, 179, 8]; 
                           if (data.column.index === daysInMonth + 5) data.cell.styles.textColor = [220, 38, 38]; 
-                       }
+                        }
                      }
                   }
                 });
@@ -1316,7 +1317,7 @@
             ...client,
             timeIn: record ? record.timeIn : '-',
             timeOut: record ? record.timeOut || '-' : '-',
-            status: record ? record.status : 'Belum Absen'
+            status: record ? (record.status === 'Menunggu' ? 'Belum Absen' : record.status) : 'Belum Absen'
           };
         });
       }, [usersDb, attendanceDb, todayStr]);
@@ -1621,7 +1622,7 @@
                                 <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeIn}</td>
                                 <td className="px-4 py-3 text-slate-600 font-bold tabular-nums">{record.timeOut || '-'}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status}</span>
+                                  <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${['Hadir', 'Terlambat'].includes(record.status) ? 'bg-green-100 text-green-700 border border-green-200' : record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{record.status === 'Menunggu' ? '-' : record.status}</span>
                                 </td>
                               </tr>
                             ))
@@ -1846,7 +1847,7 @@
                                record.status === 'Menunggu' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 
                                'bg-purple-100 text-purple-700 border border-purple-200'
                              }`}>
-                               {record.status}
+                               {record.status === 'Menunggu' ? '-' : record.status}
                              </span>
                            </td>
                            <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
